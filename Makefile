@@ -1,6 +1,8 @@
 IMAGE_NAME=asajaroff/ritsuko
-IMAGE_TAG=v1.0.0
-IMAGE="$(IMAGE_NAME):$(IMAGE_TAG)"
+IMAGE_TAG=v1.0.4
+UNIQ=$(shell git rev-parse --short HEAD)
+IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
+IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)
 ANTHROPIC_API_KEY=$(shell env | grep ANTHROPIC_API_KEY | cut -d'=' --fields 2)
 
 .PHONY: build
@@ -8,22 +10,37 @@ build:
 	docker build \
 		--progress=plain \
 		-t $(IMAGE) \
+		-t $(IMAGE_UNIQ) \
 		. 
 
 .PHONY: push
 push: build
 	docker push \
-		docker.io/$(IMAGE)
+		docker.io/$(IMAGE_UNIQ) \
 
 .PHONY: run
 run: build
 	docker run -ti \
-		docker.io/$(IMAGE)
+		-e RITSUKO_VERSION=$(IMAGE_UNIQ) \
+		docker.io/$(IMAGE_UNIQ)
+
+release:
+	docker build \
+		--progress=plain \
+		-t $(IMAGE) \
+		-t $(IMAGE_UNIQ) \
+		--build-arg RITSUKO_VERSION=$(IMAGE) \
+		.
+	docker push \
+		docker.io/$(IMAGE) \
 
 dev: ## Mounts the kubernetes config file
 	docker run -ti \
 		-v $(HOME)/.kube:/home/zulip/.kube \
 		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
+		-e ZULIP_EMAIL="" \
+		-e ZULIP_API_KEY="" \
+		-e ZULIP_SITE="https://your.zulip.chat" \
 		-e LOG_LEVEL=DEBUG \
 		$(IMAGE)
 
@@ -42,9 +59,9 @@ test: ## Run unit tests
 test-coverage: ## Run tests with coverage report
 	cd src && python -m pytest test_bot.py -v --cov=bot --cov-report=term-missing
 
-echo-env:
-	echo $(IMAGE)
-	echo $(ANTHROPIC_API_KEY)
+echo:
+	echo $(IMAGE_UNIQ)
+	echo $(IMAGE_NAME):$(IMAGE_TAG)
 
 helm-debug: ## Render the helm chart with debug information
 	cd chart
