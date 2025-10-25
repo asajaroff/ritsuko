@@ -97,3 +97,21 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Secrets configuration for API keys
+secrets:
+  # Set to true to create a secret from values below
+  create: true
+  # Zulip bot email address
+  zulipEmail: ""
+  # Zulip API key
+  zulipApiKey: ""
+  # Zulip site URL (e.g., https://your-org.zulipchat.com)
+  zulipSite: ""
+  # Anthropic API key for Claude integration
+  anthropicApiKey: ""
+
+# Environment variables configuration
+env:
+  # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  logLevel: "INFO"

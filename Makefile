@@ -36,6 +36,12 @@ dev-fixed:
 local:
 	cd src && python bot.py
 
+test: ## Run unit tests
+	cd src && python -m pytest test_bot.py -v
+
+test-coverage: ## Run tests with coverage report
+	cd src && python -m pytest test_bot.py -v --cov=bot --cov-report=term-missing
+
 echo-env:
 	echo $(IMAGE)
 	echo $(ANTHROPIC_API_KEY)

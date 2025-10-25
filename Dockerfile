@@ -20,4 +20,6 @@ WORKDIR /home/zulip-bot
 COPY --chown=zulip-bot:zulip-bot ./src/ ./
 USER zulip-bot
 
-CMD ["zulip-run-bot", "bot.py", "--config-file", "zuliprc"]
+ENV RITSUKO_VERSION='v1.0.0'
+
+CMD ["python3", "bot.py"]

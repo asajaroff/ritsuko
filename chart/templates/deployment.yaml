@@ -40,6 +40,33 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.env.logLevel | quote }}
+            - name: RITSUKO_VERSION
+              value: "{{ $.Chart.AppVersion }}-kubernetes"
+            {{- if .Values.secrets.create }}
+            - name: ZULIP_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: zulip-email
+            - name: ZULIP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: zulip-api-key
+            - name: ZULIP_SITE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: zulip-site
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: anthropic-api-key
+            {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
