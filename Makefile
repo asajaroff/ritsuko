@@ -39,3 +39,17 @@ local:
 echo-env:
 	echo $(IMAGE)
 	echo $(ANTHROPIC_API_KEY)
+
+helm-debug: ## Render the helm chart with debug information
+	cd chart
+	helm install ritsuko-bot \
+		--dry-run \
+		--debug \
+		-f ./chart/values.yaml \
+		chart/
+
+helm-install: ## Installs the chart
+	cd chart
+	helm install ritsuko-bot \
+		-f ./chart/values.yaml \
+		chart/
