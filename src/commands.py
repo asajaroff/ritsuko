@@ -36,43 +36,39 @@ def parse_command(message):
 
 
 def handle_help(message, args):
-    """Handle the help command."""
-    help_text = """
+    help_text = """markdown
 **Available Commands:**
-- `help` - Show this help message
-- `ping` - Check if bot is responsive
+- `ai <prompt>` - Interact with an LLM **TODO**
+- `mcp <prompt>` - Interact with an LLM and MCP servers **TODO**
 - `status` - Get bot status information
-- `clusters` - Lists the cluster name and kubernetes cluster name
-- `echo <text>` - Echo back the provided text
-- `version` - Show bot version
+- `clusters` | `clusters <cluster>` - Lists the cluster name and kubernetes cluster name - If a cluster is selected will bring data from that
+- `node <node_name>` - Get information about a node
+- `jira <prompt>` - Interact with Jira #TODO
+- `confluence <prompt>` - Interact with Confluence **TODO**
+- `help` - Show this help message
+- `version` - Show bot version and debug info
 
-More commands coming soon!
+Usage:
+```markdown
+@**Ritsuko** <command> [opts]
+```
 """
     return help_text
 
 
-def handle_ping(message, args):
-    """Handle the ping command."""
-    return "Pong! Bot is alive and responding."
-
-
 def handle_status(message, args):
     """Handle the status command."""
-    # TODO: Readiness proble
-    # TODO: MCP connection probes
+    # **TODO**: Readiness proble
+    # **TODO**: MCP connection probes
     return "Bot is running normally. All systems operational."
 
 def handle_clusters(message, args):
     """Handle the clusters command."""
-    return f"""
-c000  - F&F
+    return f"""## Clusters - [VMS Global Uptime](https://graphs.eencloud.com/d/jFpmPakGk/vms-global-uptime)
 c001  - aus1p1
 c002  - test
-c004  - aus1p6
-c005  - aus1p2
 c006  - nrt1p1
 c007  - hnd1p1
-c010  - sandbox
 c011  - hkg1p1
 c012  - aus1p3
 c013  - fra1p1
@@ -105,28 +101,26 @@ vm_source = 'jsqMEvfSk&var'
 def handle_node(message, nodes):
     if not nodes:
         return "Usage: `node <node>` - Please provide node name."
-    for node in nodes: # TODO: fix for more args
+    for node in nodes: # **TODO**: fix for more args
       return f"""## {node}
-## Recent events TODO:
-```shell-session
-$ kubectl get events # Get events for this particular node
-```
-
-## Kubelet status
-```shell-session
-$ check_kubelet_status('{nodes}')
-```
 ## Grafana links
 1. [Kubernetes node monitoring](https://graphs.eencloud.com/d/000000001/kubernetes-node-monitoring?orgId=1&var-Pod={vm_source}-Node={node})
 2. [Node exporter detailed](https://graphs.eencloud.com/d/bovUFBfGz/node-exporter-detailed?orgId=1&var-Pod={vm_source}-Node={node}&var-job=kubernetes-service-endpoints&var-diskdevices=%5Ba-z%5D%2B%7Cnvme%5B0-9%5D%2Bn%5B0-9%5D%2B)
 3. [Node monitoring -DC-](https://graphs.eencloud.com/d/aedj1sncwnpc0a/dc-node-monitoring?orgId=1&refresh=1m&var-eepod={vm_source}-kubernetes_node={node})
 
+## Recent events
 ```shell-session
-$ ssh {node} -- journalctl -u kubelet -p 3 --since yesterday
-<profit>
+$ kubectl events --for node/{node} --context $KUBE_CLUSTER
+```
+
+## Useful system checks
+```shell-session
+$ ssh {node} -- systemctl status kubelet.service
+$ ssh {node} -- systemctl status containerd.service
+$ ssh {node} -- systemctl status docker.service
+$ ssh {node} -- journalctl -u kubelet -p 3 --since yesterday --no-follow
 ```
 """
-    return f"https://graphs.eencloud.com/d/bovUFBfGz/node-exporter-detailed?orgId=1&var-Pod={vm_source}-Node={node_name}&var-job=kubernetes-service-endpoints&var-diskdevices=%5Ba-z%5D%2B%7Cnvme%5B0-9%5D%2Bn%5B0-9%5D%2B"
 
 def node_info(node_name):
   # Cluster status dashboard
@@ -135,17 +129,9 @@ def node_info(node_name):
   # https://graphs.eencloud.com/d/bovUFBfGz/node-exporter-detailed?orgId=1
   return f"https://graphs.eencloud.com/d/bovUFBfGz/node-exporter-detailed?orgId=1&var-Pod={vm_source}-Node={node_name}&var-job=kubernetes-service-endpoints&var-diskdevices=%5Ba-z%5D%2B%7Cnvme%5B0-9%5D%2Bn%5B0-9%5D%2B"
 
-
-def handle_echo(message, args):
-    """Handle the echo command."""
-    if not args:
-        return "Usage: `echo <text>` - Please provide text to echo."
-    return ' '.join(args)
-
 def handle_version(message, args):
     """Handle the version command."""
-    return f"Ritsuko {environ.get('RITSUKO_VERSION', 'local-dev')}"
-
+    return f"Ritsuko {environ.get('RITSUKO_VERSION', 'v1.0.5 running in Alejandro\'s laptop')}"
 
 def handle_unknown(message, command):
     """Handle unknown commands."""
@@ -172,16 +158,16 @@ def execute_command(message):
     match command:
         case 'help':
             return handle_help(message, args)
-        case 'ping':
-            return handle_ping(message, args)
-        case 'status':
-            return handle_status(message, args)
-        case 'clusters':
-            return handle_clusters(message, args)
+        case 'ai':
+            return "AI command is not yet implemented. Coming soon!"
+        case 'mcp':
+            return "MCP command is not yet implemented. Coming soon!"
         case 'node':
             return handle_node(message, args)
-        case 'echo':
-            return handle_echo(message, args)
+        case 'clusters':
+            return handle_clusters(message, args)
+        case 'status':
+            return handle_status(message, args)
         case 'version':
             return handle_version(message, args)
         case _:

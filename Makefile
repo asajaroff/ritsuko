@@ -1,4 +1,4 @@
-IMAGE_NAME=asajaroff/ritsuko
+IMAGE_NAME=harbor.eencloud.com/test/ritsuko
 IMAGE_TAG=v1.0.4
 UNIQ=$(shell git rev-parse --short HEAD)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
@@ -16,7 +16,8 @@ build:
 .PHONY: push
 push: build
 	docker push \
-		docker.io/$(IMAGE_UNIQ) \
+		$(IMAGE_UNIQ)
+		# docker.io/$(IMAGE_UNIQ) \
 
 .PHONY: run
 run: build

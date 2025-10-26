@@ -2,6 +2,8 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch, call
 import sys
+import urllib.request
+import time
 
 # Set up required environment variables before importing bot
 os.environ['ZULIP_EMAIL'] = 'bot@example.com'
@@ -99,7 +101,7 @@ class TestHandleMessage(unittest.TestCase):
 
         message = {
             'sender_email': 'asajaroff@een.com',
-            'content': 'ping',
+            'content': 'status',
             'type': 'private',
             'display_recipient': [
                 {'email': 'asajaroff@een.com'},
@@ -112,7 +114,7 @@ class TestHandleMessage(unittest.TestCase):
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
         self.assertEqual(call_args['type'], 'private')
-        self.assertIn('Pong', call_args['content'])
+        self.assertIn('running normally', call_args['content'])
 
     @patch('bot.send_message')
     def test_handle_message_authorized_user_stream(self, mock_send):
@@ -121,7 +123,7 @@ class TestHandleMessage(unittest.TestCase):
 
         message = {
             'sender_email': 'asajaroff@een.com',
-            'content': '@bot ping',
+            'content': '@bot status',
             'type': 'stream',
             'display_recipient': 'general',
             'subject': 'test topic'
@@ -134,7 +136,7 @@ class TestHandleMessage(unittest.TestCase):
         self.assertEqual(call_args['type'], 'stream')
         self.assertEqual(call_args['to'], 'general')
         self.assertEqual(call_args['subject'], 'test topic')
-        self.assertIn('Pong', call_args['content'])
+        self.assertIn('running normally', call_args['content'])
 
     @patch('bot.send_message')
     def test_handle_message_unauthorized_user_private(self, mock_send):
@@ -254,40 +256,20 @@ class TestCommandParsing(unittest.TestCase):
 
         self.assertIn('Available Commands', response)
         self.assertIn('help', response)
-        self.assertIn('ping', response)
+        self.assertIn('status', response)
+        self.assertIn('node', response)
 
-    def test_execute_command_ping(self):
-        """Test ping command execution."""
+    def test_execute_command_status(self):
+        """Test status command execution."""
         message = {
             'type': 'private',
-            'content': 'ping'
+            'content': 'status'
         }
 
         response = execute_command(message)
 
-        self.assertIn('Pong', response)
-
-    def test_execute_command_echo_with_args(self):
-        """Test echo command with arguments."""
-        message = {
-            'type': 'private',
-            'content': 'echo hello world'
-        }
-
-        response = execute_command(message)
-
-        self.assertEqual(response, 'hello world')
-
-    def test_execute_command_echo_no_args(self):
-        """Test echo command without arguments."""
-        message = {
-            'type': 'private',
-            'content': 'echo'
-        }
-
-        response = execute_command(message)
-
-        self.assertIn('Usage', response)
+        self.assertIn('running normally', response)
+        self.assertIn('operational', response)
 
     def test_execute_command_unknown(self):
         """Test unknown command execution."""
@@ -322,7 +304,197 @@ class TestCommandParsing(unittest.TestCase):
         response = execute_command(message)
 
         self.assertIn('Ritsuko', response)
-        self.assertIn('local-dev', response)
+        # Version string will vary based on environment
+        self.assertTrue('v1.0' in response or 'laptop' in response or 'local' in response.lower())
+
+
+class TestNodeCommand(unittest.TestCase):
+    """Test the node command functionality."""
+
+    def test_execute_command_node_with_single_node(self):
+        """Test node command with a single node name."""
+        message = {
+            'type': 'private',
+            'content': 'node test-node-01'
+        }
+
+        response = execute_command(message)
+
+        self.assertIn('test-node-01', response)
+        self.assertIn('Recent events', response)
+        self.assertIn('Useful system checks', response)
+        self.assertIn('Grafana links', response)
+        self.assertIn('graphs.eencloud.com', response)
+        self.assertIn('kubernetes-node-monitoring', response)
+        self.assertIn('node-exporter-detailed', response)
+
+    def test_execute_command_node_with_multiple_nodes(self):
+        """Test node command with multiple node names."""
+        message = {
+            'type': 'private',
+            'content': 'node node1 node2 node3'
+        }
+
+        response = execute_command(message)
+
+        # Should only process first node due to current implementation
+        self.assertIn('node1', response)
+        self.assertIn('Recent events', response)
+        self.assertIn('Grafana links', response)
+
+    def test_execute_command_node_no_args(self):
+        """Test node command without arguments."""
+        message = {
+            'type': 'private',
+            'content': 'node'
+        }
+
+        response = execute_command(message)
+
+        self.assertIn('Usage', response)
+        self.assertIn('node <node>', response)
+        self.assertIn('provide node name', response)
+
+    def test_execute_command_node_from_stream(self):
+        """Test node command from stream message."""
+        message = {
+            'type': 'stream',
+            'content': '@bot node aus1p1-worker-01'
+        }
+
+        response = execute_command(message)
+
+        self.assertIn('aus1p1-worker-01', response)
+        self.assertIn('Grafana links', response)
+
+    def test_node_command_includes_kubectl_commands(self):
+        """Test that node command output includes kubectl command examples."""
+        message = {
+            'type': 'private',
+            'content': 'node test-node'
+        }
+
+        response = execute_command(message)
+
+        self.assertIn('kubectl events', response)
+        self.assertIn('systemctl status kubelet', response)
+
+    def test_node_command_includes_grafana_dashboard_links(self):
+        """Test that node command includes all three Grafana dashboard links."""
+        message = {
+            'type': 'private',
+            'content': 'node worker-node-123'
+        }
+
+        response = execute_command(message)
+
+        # Check for all three Grafana dashboard links
+        self.assertIn('Kubernetes node monitoring', response)
+        self.assertIn('Node exporter detailed', response)
+        self.assertIn('Node monitoring -DC-', response)
+
+        # Verify URL structure
+        self.assertIn('Node=worker-node-123', response)
+        self.assertIn('kubernetes_node=worker-node-123', response)
+
+    def test_node_command_includes_journalctl_example(self):
+        """Test that node command includes journalctl SSH example."""
+        message = {
+            'type': 'private',
+            'content': 'node prod-node-05'
+        }
+
+        response = execute_command(message)
+
+        self.assertIn('ssh prod-node-05', response)
+        self.assertIn('journalctl -u kubelet', response)
+        self.assertIn('--since yesterday', response)
+
+    def test_node_command_with_special_characters(self):
+        """Test node command with node name containing special characters."""
+        message = {
+            'type': 'private',
+            'content': 'node aus1p1-worker-01.example.com'
+        }
+
+        response = execute_command(message)
+
+        self.assertIn('aus1p1-worker-01.example.com', response)
+        self.assertIn('Grafana links', response)
+
+    def test_node_command_formatting(self):
+        """Test that node command response is properly formatted with markdown."""
+        message = {
+            'type': 'private',
+            'content': 'node test-node'
+        }
+
+        response = execute_command(message)
+
+        # Check for markdown formatting elements
+        self.assertIn('##', response)  # Headers
+        self.assertIn('```', response)  # Code blocks
+        self.assertIn('[', response)    # Links
+        self.assertIn(']', response)
+
+
+class TestHealthCheckServer(unittest.TestCase):
+    """Test the health check HTTP server."""
+
+    def test_health_server_starts(self):
+        """Test that health server starts successfully."""
+        server = bot.start_health_server(port=8081)
+
+        # Give server time to start
+        time.sleep(0.5)
+
+        self.assertIsNotNone(server)
+
+        # Clean up
+        server.shutdown()
+
+    def test_healthz_endpoint(self):
+        """Test /healthz endpoint returns 200 OK."""
+        server = bot.start_health_server(port=8082)
+
+        # Give server time to start
+        time.sleep(0.5)
+
+        try:
+            response = urllib.request.urlopen('http://localhost:8082/healthz', timeout=2)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.read(), b'OK')
+        finally:
+            server.shutdown()
+
+    def test_readyz_endpoint(self):
+        """Test /readyz endpoint returns 200 OK."""
+        server = bot.start_health_server(port=8083)
+
+        # Give server time to start
+        time.sleep(0.5)
+
+        try:
+            response = urllib.request.urlopen('http://localhost:8083/readyz', timeout=2)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.read(), b'OK')
+        finally:
+            server.shutdown()
+
+    def test_invalid_endpoint_returns_404(self):
+        """Test that invalid endpoints return 404."""
+        server = bot.start_health_server(port=8084)
+
+        # Give server time to start
+        time.sleep(0.5)
+
+        try:
+            urllib.request.urlopen('http://localhost:8084/invalid', timeout=2)
+            self.fail("Should have raised HTTPError")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 404)
+        finally:
+            server.shutdown()
 
 
 if __name__ == '__main__':
