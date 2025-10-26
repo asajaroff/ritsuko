@@ -101,9 +101,6 @@ echo:
 	@echo IMAGE: $(IMAGE)
 	@echo IMAGE: $(IMAGE_UNIQ)
 	@echo ANTHROPIC: $(ANTHROPIC_API_KEY)
-	@echo IMAGE: $(IMAGE)
-	@echo IMAGE: $(IMAGE_UNIQ)
-	@echo ANTHROPIC: $(ANTHROPIC_API_KEY)
 	@echo $(ZULIP_SITE)
 	@echo $(ZULIP_EMAIL)
 
@@ -119,6 +116,7 @@ helm-debug: ## Render the helm chart with debug information
 helm-install: ## Installs the chart
 	helm upgrade --install ${HELM_RELEASE_NAME} \
 		-f ./chart/values-override.yaml \
+		--set 'image.tag=${IMAGE_TAG_UNIQ}' \
 		chart/
 
 helm-uninstall: ## Installs the chart
