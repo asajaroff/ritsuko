@@ -1,6 +1,7 @@
 IMAGE_NAME=harbor.eencloud.com/test/ritsuko
-IMAGE_TAG=v1.0.4
 UNIQ=$(shell git rev-parse --short HEAD)
+IMAGE_TAG=v1.0.4
+IMAGE_TAG_UNIQ= $(IMAGE_TAG)-$(UNIQ)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)
 ANTHROPIC_API_KEY=$(shell env | grep ANTHROPIC_API_KEY | cut -d'=' --fields 2)
@@ -61,19 +62,33 @@ test-coverage: ## Run tests with coverage report
 	cd src && python -m pytest test_bot.py -v --cov=bot --cov-report=term-missing
 
 echo:
-	echo $(IMAGE_UNIQ)
-	echo $(IMAGE_NAME):$(IMAGE_TAG)
+	@echo $(IMAGE_UNIQ)
+	@echo $(IMAGE_NAME):$(IMAGE_TAG)
+	@echo $(IMAGE_NAME):$(IMAGE_TAG_UNIQ)
+	@echo IMAGE_NAME: $(IMAGE_NAME)
+	@echo UNIQ: $(UNIQ)
+	@echo IMAGE_TAG: $(IMAGE_TAG)
+	@echo IMAGE_TAG_UNIQ: $(IMAGE_TAG_UNIQ)
+	@echo IMAGE: $(IMAGE)
+	@echo IMAGE: $(IMAGE_UNIQ)
+	@echo ANTHROPIC: $(ANTHROPIC_API_KEY)
 
+HELM_RELEASE_NAME = ritsuko-make
 helm-debug: ## Render the helm chart with debug information
 	cd chart
-	helm install ritsuko-bot \
+	helm install ${HELM_RELEASE_NAME} \
 		--dry-run \
 		--debug \
 		-f ./chart/values.yaml \
 		chart/
 
 helm-install: ## Installs the chart
-	cd chart
-	helm install ritsuko-bot \
-		-f ./chart/values.yaml \
+	helm upgrade --install ${HELM_RELEASE_NAME} \
+		-f ./chart/values-override.yaml \
+		--set 'image.tag=${IMAGE_TAG_UNIQ}' \
 		chart/
+
+helm-uninstall: ## Installs the chart
+	helm del ${HELM_RELEASE_NAME}
+
+helm-reinstall: helm-uninstall helm-install

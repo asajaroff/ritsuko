@@ -164,6 +164,8 @@ def execute_command(message):
             return "MCP command is not yet implemented. Coming soon!"
         case 'node':
             return handle_node(message, args)
+        case 'cluster':
+            return handle_clusters(message, args)
         case 'clusters':
             return handle_clusters(message, args)
         case 'status':
