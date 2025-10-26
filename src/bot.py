@@ -2,6 +2,8 @@ import os
 import logging
 import zulip
 import sys
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from commands import execute_command
 
 # Set up logging
@@ -35,8 +37,46 @@ except Exception as e:
 
 authorized_users = [
     'asajaroff@een.com',
+    'miniguez@een.com',
+    'jchio@een.com',
+    'mgolden@een.com',
+    'pwhiteside@een.com',
     'cjewell@een.com'
     ] # TODO: move authorized_users to environment variables
+
+# Health check server
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Simple HTTP handler for health checks."""
+
+    def do_GET(self):
+        """Handle GET requests for health checks."""
+        if self.path in ['/healthz', '/readyz']:
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'OK')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        """Suppress default logging to avoid cluttering logs."""
+        pass
+
+def start_health_server(port=8080):
+    """Start HTTP server for health checks in a separate thread."""
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    logging.info(f'Starting health check server on port {port}')
+
+    def serve():
+        try:
+            server.serve_forever()
+        except Exception as e:
+            logging.error(f'Health check server error: {e}')
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    return server
 
 def send_message(message_dict):
     """Send a message with error handling."""
@@ -104,6 +144,9 @@ def handle_message(message):
 
 def main():
     """Main function to run the bot."""
+    # Start health check server
+    start_health_server(port=8080)
+
     # Subscribe to messages
     logging.info('Starting Zulip bot...')
     try:
