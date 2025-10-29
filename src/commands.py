@@ -132,8 +132,8 @@ def handle_node(message, nodes):
 
       json_string = response.data.decode('utf-8')
       matchbox_data = json.loads(json_string)
-      context = matchbox_data['metadata']['pod']
-
+      context = matchbox_data.get('metadata', {}).get('pod', None)
+      # context = matchbox_data['metadata']['pod']
 
       return f"""### {node}
 **Cluster**: {matchbox_data['metadata']['pod']} | **PublicIP**: \t{matchbox_data['metadata']['public_ip']}
@@ -159,15 +159,15 @@ Flatcar: {matchbox_data['metadata']['flatcar_version']}
 ## Recent events
 
 ```bash
-kubectl get events --context {context} \
-      --field-selector involvedObject.name={node} \
-      --sort-by=metadata.creationTimestamp \
+kubectl get events --context {context} \\
+      --field-selector involvedObject.name={node} \\
+      --sort-by=metadata.creationTimestamp \\
       -A
 ```
 
 ```bash
-kubectl get pods --context {context} -A \
-      --field-selector='status.phase=Failed' \
+kubectl get pods --context {context} -A \\
+      --field-selector='status.phase=Failed'
 ```
 
 ```bash
