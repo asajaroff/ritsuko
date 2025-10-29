@@ -74,6 +74,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "ritsuko-bot.fullname" . }}
                   key: anthropic-api-key
+            - name: GITHUB_MATCHBOX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: github-matchbox-token
             {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:

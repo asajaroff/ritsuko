@@ -41,6 +41,7 @@ authorized_users = [
     'jchio@een.com',
     'mgolden@een.com',
     'pwhiteside@een.com',
+    'mdiemel@een.com',
     'cjewell@een.com'
     ] # TODO: move authorized_users to environment variables
 
