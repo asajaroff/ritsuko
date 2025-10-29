@@ -136,10 +136,9 @@ def handle_node(message, nodes):
 
 
       return f"""### {node}
-Cluster:\t{matchbox_data['metadata']['pod']}
-Public IP:\t{matchbox_data['metadata']['public_ip']}
-Kubernetes version:\t{matchbox_data['metadata']['kubernetes_version']}
-Flatcar version:\t{matchbox_data['metadata']['flatcar_version']}
+**Cluster**: {matchbox_data['metadata']['pod']} | **PublicIP**: \t{matchbox_data['metadata']['public_ip']}
+Kubernetes: {matchbox_data['metadata']['kubernetes_version']}
+Flatcar: {matchbox_data['metadata']['flatcar_version']}
 
 ```spoiler Grafana dashboard
 ## Grafana links
