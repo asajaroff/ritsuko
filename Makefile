@@ -9,6 +9,8 @@ ANTHROPIC_API_KEY=$(shell env | grep ANTHROPIC_API_KEY | cut -d'=' --fields 2)
 ZULIP_SITE=$(shell cat .env | grep ZULIP_SITE | cut -d'=' -f 2)
 ZULIP_EMAIL=$(shell cat .env | grep ZULIP_EMAIL | cut -d'=' -f 2)
 ZULIP_API_KEY=$(shell cat .env | grep ZULIP_API_KEY | cut -d'=' -f 2)
+GITHUB_MATCHOX_TOKEN=$(shell cat .env | grep GITHUB_MATCHOX_TOKEN | cut -d'=' -f 2)
+
 
 .PHONY: help
 .DEFAULT_GOAL=help
@@ -28,7 +30,6 @@ build:
 push: build
 	docker push \
 		$(IMAGE_UNIQ)
-		# docker.io/$(IMAGE_UNIQ) \
 
 .PHONY: run
 run: build ## Runs the container locally with docker
@@ -36,17 +37,33 @@ run: build ## Runs the container locally with docker
 		-e RITSUKO_VERSION=$(IMAGE_UNIQ) \
 		docker.io/$(IMAGE_UNIQ)
 
-dev: ## Runs the container locally in debug mode
+dev: ## Runs the container locally
 	docker run -ti \
 		-v $(HOME)/.kube:/home/zulip/.kube \
 		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
+		-e GITHUB_MATCHBOX_KEY=$(ZULIP_EMAIL) \
+		-e GITHUB_MATCHBOX_TOKEN=$(GITHUB_MATCHBOX_TOKEN) \
+		-e ZULIP_EMAIL=$(ZULIP_EMAIL) \
+		-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
+		-e ZULIP_SITE=$(ZULIP_SITE) \
+		-e LOG_LEVEL=INFO \
+		$(IMAGE)
+
+debug: ## Runs the container locally in debug mode
+	docker run -ti \
+		-v $(HOME)/.kube:/home/zulip/.kube \
+		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
+		-e GITHUB_MATCHBOX_KEY=$(ZULIP_EMAIL) \
+		-e GITHUB_MATCHBOX_TOKEN=$(GITHUB_MATCHBOX_TOKEN) \
 		-e ZULIP_EMAIL=$(ZULIP_EMAIL) \
 		-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
 		-e ZULIP_SITE=$(ZULIP_SITE) \
 		-e LOG_LEVEL=DEBUG \
 		$(IMAGE)
 
+
 local:
+	. .venv/bin/activate
 	./run.sh
 
 test: ## Run unit tests
