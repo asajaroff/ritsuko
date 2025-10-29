@@ -37,6 +37,12 @@ run: build ## Runs the container locally with docker
 		-e RITSUKO_VERSION=$(IMAGE_UNIQ) \
 		docker.io/$(IMAGE_UNIQ)
 
+.PHONY: release
+release: ## Updates the git tag in chart/Chart.yaml, commits it and pushes it upstream
+	yq -y --in-place ".appVersion = \"$(IMAGE_TAG_UNIQ)\"" chart/Chart.yaml
+	git add chart/Chart.yaml
+	git commit -m "Upadting chart appVersion to $(IMAGE_TAG_UNIQ)"
+
 dev: ## Runs the container locally
 	docker run -ti \
 		-v $(HOME)/.kube:/home/zulip/.kube \
