@@ -110,7 +110,7 @@ def handle_message(message):
             if message['type'] == 'private':
                 send_message(dict(
                     type='private',
-                    to=[r['email'] for r in message['display_recipient']],
+                    to=[r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
                     content=response
                 ))
 
@@ -127,7 +127,7 @@ def handle_message(message):
             if message['type'] == 'private':
                 send_message(dict(
                     type='private',
-                    to=[r['email'] for r in message['display_recipient']],
+                    to=[r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
                     content='I am not authorized to talk to you'
                 ))
 

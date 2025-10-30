@@ -6,25 +6,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Nautobot integration** (`src/fetchers.py`, `src/commands.py`)
+  - New `get_nautobot_devices()` function to query Nautobot API for device information
+  - New `nautobot` command that accepts node names as arguments
+  - Retrieves and displays device information including:
+    - Device name with link to Nautobot
+    - Rack information with link
+    - Kubernetes version from custom fields
+  - Supports querying multiple nodes in a single command
+  - Comprehensive error handling for API requests (OSError, AttributeError, JSONDecodeError)
+  - Uses `urllib3.PoolManager` for HTTP requests
+
+- **Nautobot configuration** (`chart/templates/deployment.yaml`, `chart/templates/secret.yaml`, `chart/values.yaml`)
+  - Added `NAUTOBOT_TOKEN` environment variable
+  - Added `NAUTOBOT_URL` environment variable
+  - New secret fields for Nautobot API credentials
+  - Documented GitHub Matchbox token in values.yaml
+
+- **Additional authorized user** (`src/bot.py`)
+  - Added `manuvs@een.com` (without the dot)
+
+### Changed
+
+- **Makefile version bump**
+  - Updated `IMAGE_TAG` from `v1.0.4` to `v1.1.0`
+  - Modified release target to echo git commands instead of executing them (for safer releases)
+
+- **Helm chart metadata** (`chart/Chart.yaml`)
+  - Updated `appVersion` from `v1.0.4-05ebf72` to `v1.1.0-1e58eae`
+
+- **Test suite enhancements** (`src/test_bot.py`)
+  - Added comprehensive tests for Nautobot integration:
+    - `test_get_nautobot_devices_success` - Tests successful device retrieval
+    - `test_get_nautobot_devices_no_results` - Tests empty results handling
+    - `test_get_nautobot_devices_with_missing_fields` - Tests handling of optional fields
+    - `test_get_nautobot_devices_api_error` - Tests API error handling
+    - `test_handle_nautobot_single_node` - Tests single node query
+    - `test_handle_nautobot_multiple_nodes` - Tests multiple node queries
+  - Updated all node command tests to mock HTTP requests properly
+  - Added mock responses for Matchbox API calls in node tests
+  - Added environment variable setup for `NAUTOBOT_TOKEN`, `NAUTOBOT_URL`, and `GITHUB_MATCHBOX_TOKEN`
+  - Updated imports to include `json`, `Mock`, `handle_nautobot`, `get_nautobot_devices`, and `handle_node`
+  - Fixed test expectations: changed "Useful system checks" to "Terminal one-liners"
+  - Fixed kubectl command expectation: changed "kubectl events" to "kubectl get events"
+  - All tests now properly mock external API calls
+
 ### Fixed
 
 - **Bug in command routing** (`src/commands.py`)
   - Fixed reference to non-existent `handle_ping()` function in line 164
   - Changed `ai` command to return placeholder message: "AI command is not yet implemented. Coming soon!"
   - Changed `mcp` command to return placeholder message: "MCP command is not yet implemented. Coming soon!"
-
-### Changed
-
-- **Test suite updates** (`src/test_bot.py`)
-  - Removed tests for deleted `ping` and `echo` commands
-  - Updated `test_handle_message_authorized_user_private` to use `status` command instead of `ping`
-  - Updated `test_handle_message_authorized_user_stream` to use `status` command instead of `ping`
-  - Added new `test_execute_command_status` test for status command
-  - Updated `test_execute_command_help` to check for `status` and `node` commands
-  - Updated `test_execute_command_version` to handle variable version strings
-  - Updated `test_execute_command_node_with_single_node` to check for "Useful system checks" instead of "Kubelet status"
-  - Updated `test_node_command_includes_kubectl_commands` to match new kubectl syntax ("kubectl events" vs "kubectl get events")
-  - All 31 tests now pass successfully
 
 ## [v1.0.4] - 2025-10-26 (commit 7e5afb7)
 
