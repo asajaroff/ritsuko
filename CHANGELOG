@@ -53,6 +53,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Fixed kubectl command expectation: changed "kubectl events" to "kubectl get events"
   - All tests now properly mock external API calls
 
+- **Test structure reorganization** (`tests/`, `Makefile`)
+  - Created dedicated `./tests` directory for all test files
+  - Moved `src/test_bot.py` to `tests/test_bot.py`
+  - Moved `test_fetcher.py` to `tests/test_fetcher.py`
+  - Updated test imports to add `src` to Python path for proper module resolution
+  - Updated Makefile `test` target: changed from `cd src && python -m pytest test_bot.py -v` to `python -m pytest tests/ -v`
+  - Updated Makefile `test-coverage` target: changed to `python -m pytest tests/ -v --cov=src --cov-report=term-missing`
+  - All 52 tests pass successfully in new location
+
 ### Fixed
 
 - **Bug in command routing** (`src/commands.py`)

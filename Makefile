@@ -73,10 +73,10 @@ local:
 	./run.sh
 
 test: ## Run unit tests
-	cd src && python -m pytest test_bot.py -v
+	python -m pytest tests/ -v
 
 test-coverage: ## Run tests with coverage report
-	cd src && python -m pytest test_bot.py -v --cov=bot --cov-report=term-missing
+	python -m pytest tests/ -v --cov=src --cov-report=term-missing
 
 echo:
 	@echo $(IMAGE_UNIQ)

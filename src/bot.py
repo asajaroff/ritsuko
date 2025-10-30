@@ -38,6 +38,7 @@ except Exception as e:
 authorized_users = [
     'asajaroff@een.com',
     'miniguez@een.com',
+    'user1088@chat.eencloud.com',
     'jchio@een.com',
     'mgolden@een.com',
     'pwhiteside@een.com',

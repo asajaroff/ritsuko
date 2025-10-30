@@ -6,6 +6,9 @@ import urllib.request
 import time
 import json
 
+# Add src to path before imports
+sys.path.insert(0, 'src')
+
 # Set up required environment variables before importing bot
 os.environ['ZULIP_EMAIL'] = 'bot@example.com'
 os.environ['ZULIP_API_KEY'] = 'test_api_key'
