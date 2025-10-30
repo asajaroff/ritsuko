@@ -123,6 +123,12 @@ secrets:
   zulipSite: ""
   # Anthropic API key for Claude integration
   anthropicApiKey: ""
+  # GitHub Matchbox token for accessing matchbox repository
+  githubMatchboxToken: ""
+  # Nautobot API token
+  nautobotToken: ""
+  # Nautobot API URL (e.g., https://nautobot.eencloud.com/api)
+  nautobotUrl: ""
 
 # Environment variables configuration
 env:

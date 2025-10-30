@@ -1,6 +1,6 @@
 IMAGE_NAME=harbor.eencloud.com/test/ritsuko
 UNIQ=$(shell git rev-parse --short HEAD)
-IMAGE_TAG=v1.0.4
+IMAGE_TAG=v1.1.0
 IMAGE_TAG_UNIQ= $(IMAGE_TAG)-$(UNIQ)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)
@@ -40,8 +40,8 @@ run: build ## Runs the container locally with docker
 .PHONY: release
 release: ## Updates the git tag in chart/Chart.yaml, commits it and pushes it upstream
 	yq -y --in-place ".appVersion = \"$(IMAGE_TAG_UNIQ)\"" chart/Chart.yaml
-	git add chart/Chart.yaml
-	git commit -m "Upadting chart appVersion to $(IMAGE_TAG_UNIQ)"
+	echo 'git add chart/Chart.yaml'
+	echo 'git commit -m "Upadting chart appVersion to $(IMAGE_TAG_UNIQ)"'
 
 dev: ## Runs the container locally
 	docker run -ti \

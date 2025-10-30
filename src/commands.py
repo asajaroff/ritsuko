@@ -5,6 +5,8 @@ import json
 
 from nodes import handle_node
 
+from fetchers import get_nautobot_devices
+
 def parse_command(message):
     """
     Parse command from a Zulip message.
@@ -96,6 +98,13 @@ c030  - aus1p17
 c031  - aus2p1
 """
 
+def handle_nautobot(args):
+  all_devices = []
+  for node in args:
+    devices = get_nautobot_devices(node)
+    all_devices.extend(devices)
+  return '\n'.join(all_devices) 
+
 def handle_version(message, args):
     """Handle the version command."""
     return f"Ritsuko {environ.get('RITSUKO_VERSION', 'v1.0.5 running in Alejandro\'s laptop')}"
@@ -131,6 +140,8 @@ def execute_command(message):
             return "MCP command is not yet implemented. Coming soon!"
         case 'node':
             return handle_node(message, args)
+        case 'nautobot':
+            return handle_nautobot(args)
         case 'cluster':
             return handle_clusters(message, args)
         case 'clusters':

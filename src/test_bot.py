@@ -1,20 +1,26 @@
 import os
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch, call, Mock
 import sys
 import urllib.request
 import time
+import json
 
 # Set up required environment variables before importing bot
 os.environ['ZULIP_EMAIL'] = 'bot@example.com'
 os.environ['ZULIP_API_KEY'] = 'test_api_key'
 os.environ['ZULIP_SITE'] = 'https://test.zulipchat.com'
+os.environ['NAUTOBOT_TOKEN'] = 'test_nautobot_token'
+os.environ['NAUTOBOT_URL'] = 'https://nautobot.test.com/api'
+os.environ['GITHUB_MATCHBOX_TOKEN'] = 'test_github_token'
 
 # Mock zulip module before importing bot
 sys.modules['zulip'] = MagicMock()
 
 import bot
-from commands import parse_command, execute_command
+from commands import parse_command, execute_command, handle_nautobot
+from fetchers import get_nautobot_devices
+from nodes import handle_node
 
 
 class TestSendMessage(unittest.TestCase):
@@ -495,6 +501,404 @@ class TestHealthCheckServer(unittest.TestCase):
             self.assertEqual(e.code, 404)
         finally:
             server.shutdown()
+
+
+class TestNautobotFetcher(unittest.TestCase):
+    """Test the get_nautobot_devices function."""
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_success(self, mock_pool_manager):
+        """Test successful device fetch from Nautobot."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        # Mock response data
+        response_data = {
+            'count': 2,
+            'results': [
+                {
+                    'name': 'test-node-01',
+                    'url': 'https://nautobot.test.com/devices/1/',
+                    'rack': {
+                        'id': 'rack-01',
+                        'url': 'https://nautobot.test.com/racks/1/'
+                    },
+                    'custom_fields': {
+                        'kubernetes_version': 'v1.27.0'
+                    }
+                },
+                {
+                    'name': 'test-node-02',
+                    'url': 'https://nautobot.test.com/devices/2/',
+                    'rack': {
+                        'id': 'rack-02',
+                        'url': 'https://nautobot.test.com/racks/2/'
+                    },
+                    'custom_fields': {
+                        'kubernetes_version': 'v1.28.0'
+                    }
+                }
+            ]
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('test-node')
+
+        self.assertEqual(len(result), 2)
+        self.assertIn('test-node-01', result[0])
+        self.assertIn('v1.27.0', result[0])
+        self.assertIn('rack-01', result[0])
+        self.assertIn('test-node-02', result[1])
+        self.assertIn('v1.28.0', result[1])
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_empty_results(self, mock_pool_manager):
+        """Test Nautobot fetch with no results."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        response_data = {
+            'count': 0,
+            'results': []
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('nonexistent-node')
+
+        self.assertEqual(len(result), 0)
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_null_rack(self, mock_pool_manager):
+        """Test device with null rack field."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        response_data = {
+            'count': 1,
+            'results': [
+                {
+                    'name': 'test-node',
+                    'url': 'https://nautobot.test.com/devices/1/',
+                    'rack': None,
+                    'custom_fields': {
+                        'kubernetes_version': 'v1.27.0'
+                    }
+                }
+            ]
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('test-node')
+
+        self.assertEqual(len(result), 1)
+        self.assertIn('test-node', result[0])
+        self.assertIn('N/A', result[0])  # Should show N/A for missing rack
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_null_kubernetes_version(self, mock_pool_manager):
+        """Test device with null kubernetes_version."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        response_data = {
+            'count': 1,
+            'results': [
+                {
+                    'name': 'test-node',
+                    'url': 'https://nautobot.test.com/devices/1/',
+                    'rack': {
+                        'id': 'rack-01',
+                        'url': 'https://nautobot.test.com/racks/1/'
+                    },
+                    'custom_fields': {
+                        'kubernetes_version': None
+                    }
+                }
+            ]
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('test-node')
+
+        self.assertEqual(len(result), 1)
+        self.assertIn('N/A', result[0])  # Should show N/A for null k8s version
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_network_error(self, mock_pool_manager):
+        """Test handling of network errors."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+        mock_http.request.side_effect = OSError('Connection failed')
+
+        result = get_nautobot_devices('test-node')
+
+        self.assertEqual(result, [])
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_json_decode_error(self, mock_pool_manager):
+        """Test handling of invalid JSON response."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        mock_response = MagicMock()
+        mock_response.data = b'Invalid JSON'
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('test-node')
+
+        self.assertEqual(result, [])
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_missing_custom_fields(self, mock_pool_manager):
+        """Test device with missing custom_fields entirely."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        response_data = {
+            'count': 1,
+            'results': [
+                {
+                    'name': 'test-node',
+                    'url': 'https://nautobot.test.com/devices/1/',
+                    'rack': {
+                        'id': 'rack-01',
+                        'url': 'https://nautobot.test.com/racks/1/'
+                    },
+                    'custom_fields': None
+                }
+            ]
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('test-node')
+
+        self.assertEqual(len(result), 1)
+        self.assertIn('N/A', result[0])  # Should show N/A for missing custom_fields
+
+
+class TestNautobotCommand(unittest.TestCase):
+    """Test the nautobot command functionality."""
+
+    @patch('commands.get_nautobot_devices')
+    def test_handle_nautobot_single_node(self, mock_get_devices):
+        """Test nautobot command with single node."""
+        mock_get_devices.return_value = [
+            'Device: node1\nRack: rack1\nKubernetes: v1.27.0'
+        ]
+
+        result = handle_nautobot(['node1'])
+
+        self.assertIn('node1', result)
+        self.assertIn('rack1', result)
+        mock_get_devices.assert_called_once_with('node1')
+
+    @patch('commands.get_nautobot_devices')
+    def test_handle_nautobot_multiple_nodes(self, mock_get_devices):
+        """Test nautobot command with multiple nodes."""
+        mock_get_devices.side_effect = [
+            ['Device: node1\nRack: rack1\nKubernetes: v1.27.0'],
+            ['Device: node2\nRack: rack2\nKubernetes: v1.28.0']
+        ]
+
+        result = handle_nautobot(['node1', 'node2'])
+
+        self.assertIn('node1', result)
+        self.assertIn('node2', result)
+        self.assertEqual(mock_get_devices.call_count, 2)
+
+    @patch('commands.get_nautobot_devices')
+    def test_handle_nautobot_no_results(self, mock_get_devices):
+        """Test nautobot command with no results."""
+        mock_get_devices.return_value = []
+
+        result = handle_nautobot(['nonexistent'])
+
+        self.assertEqual(result, '')
+
+    def test_execute_command_nautobot(self):
+        """Test nautobot command through execute_command."""
+        with patch('commands.get_nautobot_devices') as mock_get_devices:
+            mock_get_devices.return_value = [
+                'Device: test-node\nRack: rack1\nKubernetes: v1.27.0'
+            ]
+
+            message = {
+                'type': 'private',
+                'content': 'nautobot test-node'
+            }
+
+            response = execute_command(message)
+
+            self.assertIn('test-node', response)
+
+    def test_execute_command_nautobot_from_stream(self):
+        """Test nautobot command from stream message."""
+        with patch('commands.get_nautobot_devices') as mock_get_devices:
+            mock_get_devices.return_value = [
+                'Device: aus1-node\nRack: rack1\nKubernetes: v1.27.0'
+            ]
+
+            message = {
+                'type': 'stream',
+                'content': '@bot nautobot aus1-node'
+            }
+
+            response = execute_command(message)
+
+            self.assertIn('aus1-node', response)
+
+
+class TestNodeCommandEnhanced(unittest.TestCase):
+    """Enhanced tests for node command functionality."""
+
+    @patch('nodes.http')
+    def test_handle_node_with_valid_matchbox_data(self, mock_http):
+        """Test handle_node with valid matchbox response."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'aus1p1',
+                'public_ip': '203.0.113.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['test-node'])
+
+        self.assertIn('test-node', result)
+        self.assertIn('aus1p1', result)
+        self.assertIn('203.0.113.1', result)
+        self.assertIn('v1.27.0', result)
+        self.assertIn('3815.2.0', result)
+
+    @patch('nodes.http')
+    def test_handle_node_includes_grafana_links(self, mock_http):
+        """Test that handle_node includes all Grafana links."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['worker-node'])
+
+        # Check for Grafana dashboard links
+        self.assertIn('Kubernetes node monitoring', result)
+        self.assertIn('Node exporter detailed', result)
+        self.assertIn('Node monitoring -DC-', result)
+        self.assertIn('graphs.eencloud.com', result)
+
+    @patch('nodes.http')
+    def test_handle_node_includes_kubectl_commands(self, mock_http):
+        """Test that handle_node includes kubectl command examples."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'aus1p1',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['test-node'])
+
+        # Check for kubectl commands
+        self.assertIn('kubectl get events', result)
+        self.assertIn('--context aus1p1', result)
+        self.assertIn('--field-selector involvedObject.name=test-node', result)
+
+    @patch('nodes.http')
+    def test_handle_node_includes_ssh_commands(self, mock_http):
+        """Test that handle_node includes SSH command examples."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'fra1p1',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['prod-node'])
+
+        # Check for SSH commands
+        self.assertIn('ssh prod-node', result)
+        self.assertIn('systemctl status kubelet.service', result)
+        self.assertIn('systemctl status containerd.service', result)
+        self.assertIn('journalctl -u kubelet', result)
+
+    @patch('nodes.http')
+    def test_handle_node_markdown_formatting(self, mock_http):
+        """Test that handle_node returns properly formatted markdown."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-pod',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['test-node'])
+
+        # Check for markdown elements
+        self.assertIn('###', result)  # Headers
+        self.assertIn('```', result)  # Code blocks
+        self.assertIn('**', result)   # Bold text
+        self.assertIn('[', result)    # Links
+        self.assertIn(']', result)
+        self.assertIn('(', result)
+
+    def test_handle_node_no_arguments(self):
+        """Test handle_node with no arguments."""
+        message = {'type': 'private'}
+        result = handle_node(message, [])
+
+        self.assertIn('Usage', result)
+        self.assertIn('node <node>', result)
 
 
 if __name__ == '__main__':

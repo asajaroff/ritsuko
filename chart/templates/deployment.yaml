@@ -79,6 +79,16 @@ spec:
                 secretKeyRef:
                   name: {{ include "ritsuko-bot.fullname" . }}
                   key: github-matchbox-token
+            - name: NAUTOBOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: nautobot-token
+            - name: NAUTOBOT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: nautobot-url
             {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
