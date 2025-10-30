@@ -317,8 +317,22 @@ class TestCommandParsing(unittest.TestCase):
 class TestNodeCommand(unittest.TestCase):
     """Test the node command functionality."""
 
-    def test_execute_command_node_with_single_node(self):
+    @patch('nodes.http')
+    def test_execute_command_node_with_single_node(self, mock_http):
         """Test node command with a single node name."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'private',
             'content': 'node test-node-01'
@@ -328,14 +342,28 @@ class TestNodeCommand(unittest.TestCase):
 
         self.assertIn('test-node-01', response)
         self.assertIn('Recent events', response)
-        self.assertIn('Useful system checks', response)
+        self.assertIn('Terminal one-liners', response)
         self.assertIn('Grafana links', response)
         self.assertIn('graphs.eencloud.com', response)
         self.assertIn('kubernetes-node-monitoring', response)
         self.assertIn('node-exporter-detailed', response)
 
-    def test_execute_command_node_with_multiple_nodes(self):
+    @patch('nodes.http')
+    def test_execute_command_node_with_multiple_nodes(self, mock_http):
         """Test node command with multiple node names."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'private',
             'content': 'node node1 node2 node3'
@@ -361,8 +389,22 @@ class TestNodeCommand(unittest.TestCase):
         self.assertIn('node <node>', response)
         self.assertIn('provide node name', response)
 
-    def test_execute_command_node_from_stream(self):
+    @patch('nodes.http')
+    def test_execute_command_node_from_stream(self, mock_http):
         """Test node command from stream message."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'aus1p1',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'stream',
             'content': '@bot node aus1p1-worker-01'
@@ -373,8 +415,22 @@ class TestNodeCommand(unittest.TestCase):
         self.assertIn('aus1p1-worker-01', response)
         self.assertIn('Grafana links', response)
 
-    def test_node_command_includes_kubectl_commands(self):
+    @patch('nodes.http')
+    def test_node_command_includes_kubectl_commands(self, mock_http):
         """Test that node command output includes kubectl command examples."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'private',
             'content': 'node test-node'
@@ -382,11 +438,25 @@ class TestNodeCommand(unittest.TestCase):
 
         response = execute_command(message)
 
-        self.assertIn('kubectl events', response)
+        self.assertIn('kubectl get events', response)
         self.assertIn('systemctl status kubelet', response)
 
-    def test_node_command_includes_grafana_dashboard_links(self):
+    @patch('nodes.http')
+    def test_node_command_includes_grafana_dashboard_links(self, mock_http):
         """Test that node command includes all three Grafana dashboard links."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'private',
             'content': 'node worker-node-123'
@@ -403,8 +473,22 @@ class TestNodeCommand(unittest.TestCase):
         self.assertIn('Node=worker-node-123', response)
         self.assertIn('kubernetes_node=worker-node-123', response)
 
-    def test_node_command_includes_journalctl_example(self):
+    @patch('nodes.http')
+    def test_node_command_includes_journalctl_example(self, mock_http):
         """Test that node command includes journalctl SSH example."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'private',
             'content': 'node prod-node-05'
@@ -416,8 +500,22 @@ class TestNodeCommand(unittest.TestCase):
         self.assertIn('journalctl -u kubelet', response)
         self.assertIn('--since yesterday', response)
 
-    def test_node_command_with_special_characters(self):
+    @patch('nodes.http')
+    def test_node_command_with_special_characters(self, mock_http):
         """Test node command with node name containing special characters."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'private',
             'content': 'node aus1p1-worker-01.example.com'
@@ -428,8 +526,22 @@ class TestNodeCommand(unittest.TestCase):
         self.assertIn('aus1p1-worker-01.example.com', response)
         self.assertIn('Grafana links', response)
 
-    def test_node_command_formatting(self):
+    @patch('nodes.http')
+    def test_node_command_formatting(self, mock_http):
         """Test that node command response is properly formatted with markdown."""
+        matchbox_data = {
+            'metadata': {
+                'pod': 'test-cluster',
+                'public_ip': '10.0.0.1',
+                'kubernetes_version': 'v1.27.0',
+                'flatcar_version': '3815.2.0'
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_http.request.return_value = mock_response
+
         message = {
             'type': 'private',
             'content': 'node test-node'
