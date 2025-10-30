@@ -199,6 +199,75 @@ class TestHandleMessage(unittest.TestCase):
         # Should not try to send a message
         mock_send.assert_not_called()
 
+    @patch('bot.send_message')
+    def test_handle_message_group_pm_without_mention(self, mock_send):
+        """Test that bot ignores group PMs when not mentioned."""
+        bot.client.get_profile = MagicMock(return_value={'full_name': 'Ritsuko'})
+
+        message = {
+            'sender_email': 'asajaroff@een.com',
+            'content': 'status',
+            'type': 'private',
+            'display_recipient': [
+                {'email': 'asajaroff@een.com'},
+                {'email': 'miniguez@een.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        bot.handle_message(message)
+
+        # Should not send a message since bot was not mentioned in group PM
+        mock_send.assert_not_called()
+
+    @patch('bot.send_message')
+    def test_handle_message_group_pm_with_mention(self, mock_send):
+        """Test that bot responds to group PMs when mentioned."""
+        mock_send.return_value = True
+        bot.client.get_profile = MagicMock(return_value={'full_name': 'Ritsuko'})
+
+        message = {
+            'sender_email': 'asajaroff@een.com',
+            'content': '@**Ritsuko** status',
+            'type': 'private',
+            'display_recipient': [
+                {'email': 'asajaroff@een.com'},
+                {'email': 'miniguez@een.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        bot.handle_message(message)
+
+        # Should send a message since bot was mentioned in group PM
+        mock_send.assert_called_once()
+        call_args = mock_send.call_args[0][0]
+        self.assertEqual(call_args['type'], 'private')
+        self.assertIn('running normally', call_args['content'])
+
+    @patch('bot.send_message')
+    def test_handle_message_one_on_one_pm(self, mock_send):
+        """Test that bot responds to 1-on-1 PMs without mention."""
+        mock_send.return_value = True
+
+        message = {
+            'sender_email': 'asajaroff@een.com',
+            'content': 'status',
+            'type': 'private',
+            'display_recipient': [
+                {'email': 'asajaroff@een.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        bot.handle_message(message)
+
+        # Should send a message in 1-on-1 PM without mention required
+        mock_send.assert_called_once()
+        call_args = mock_send.call_args[0][0]
+        self.assertEqual(call_args['type'], 'private')
+        self.assertIn('running normally', call_args['content'])
+
 
 class TestCommandParsing(unittest.TestCase):
     """Test command parsing functionality."""

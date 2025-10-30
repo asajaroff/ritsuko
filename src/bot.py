@@ -104,6 +104,19 @@ def handle_message(message):
         if message['sender_email'] in authorized_users:
             logging.info(f'{message['sender_email']}: {message['content']}' )
 
+            # For private messages with multiple recipients, only respond if bot is mentioned
+            if message['type'] == 'private':
+                # Check if this is a group PM (more than 2 participants including the bot)
+                recipients = message['display_recipient']
+                is_group_pm = len(recipients) > 2
+
+                # In group PMs, only respond if bot is mentioned
+                if is_group_pm:
+                    bot_mention = f"@**{client.get_profile()['full_name']}**"
+                    if bot_mention not in message['content']:
+                        logging.debug(f'Ignoring group PM without bot mention')
+                        return
+
             # Execute command and get response
             response = execute_command(message)
 

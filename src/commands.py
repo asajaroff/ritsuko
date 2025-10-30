@@ -12,7 +12,7 @@ def parse_command(message):
     Parse command from a Zulip message.
 
     For stream messages: extracts the second word (first word after bot mention)
-    For private messages: extracts the first word
+    For private messages: extracts the first word (or second if first is a mention)
 
     Args:
         message: Zulip message dict
@@ -35,8 +35,17 @@ def parse_command(message):
         args = words[2:] if len(words) > 2 else []
     else:  # private message
         # In private messages, first word is the command
-        command = words[0].lower()
-        args = words[1:] if len(words) > 1 else []
+        # Unless it's a bot mention (e.g., @**BotName**), then second word is the command
+        start_idx = 0
+        if words[0].startswith('@**') and words[0].endswith('**'):
+            # First word is a bot mention, skip it
+            start_idx = 1
+
+        if start_idx >= len(words):
+            return None, []
+
+        command = words[start_idx].lower()
+        args = words[start_idx + 1:] if len(words) > start_idx + 1 else []
 
     return command, args
 
