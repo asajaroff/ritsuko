@@ -73,10 +73,12 @@ local:
 	./run.sh
 
 test: ## Run unit tests
-	python -m pytest tests/ -v
+	@if [ ! -d .venv ]; then echo "Virtual environment not found. Creating it..."; python3 -m venv .venv; .venv/bin/pip install -r src/requirements.txt; fi
+	.venv/bin/python -m pytest tests/ -v
 
 test-coverage: ## Run tests with coverage report
-	python -m pytest tests/ -v --cov=src --cov-report=term-missing
+	@if [ ! -d .venv ]; then echo "Virtual environment not found. Creating it..."; python3 -m venv .venv; .venv/bin/pip install -r src/requirements.txt; fi
+	.venv/bin/python -m pytest tests/ -v --cov=src --cov-report=term-missing
 
 echo:
 	@echo $(IMAGE_UNIQ)

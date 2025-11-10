@@ -38,8 +38,9 @@ def get_nautobot_devices(node):
         if device.get('rack') and device['rack'] is not None:
           device['url'] = device['url'].replace("/api/", "/", 1)
           rack_id = device['rack'].get('id', 'N/A')
+          rack_display = device['rack'].get('display', 'N/A')
           rack_url = device['rack'].get('url', '').replace("/api/", "/", 1)
-          rack_info = f"[Rack: {rack_id}]({rack_url})" if rack_url else str(rack_id)
+          rack_info = f"[Rack: {rack_display} - {rack_id}]({rack_url})" if rack_url else str(rack_id)
 
         k8s_version = "N/A"
         if device.get('custom_fields') and device['custom_fields'] is not None:
