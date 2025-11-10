@@ -38,9 +38,19 @@ def get_nautobot_devices(node):
         if device.get('rack') and device['rack'] is not None:
           device['url'] = device['url'].replace("/api/", "/", 1)
           rack_id = device['rack'].get('id', 'N/A')
-          rack_display = device['rack'].get('display', 'N/A')
+
+          rack_query = http.request(
+                "GET",
+                f"{nautobot_url}/dcim/racks/{rack_id}",
+                headers=nautobot_headers,
+                redirect=True)
+
+          # https://nautobot.eencloud.com/api/dcim/racks/a283344f-a59c-466d-8fb5-cd1055aeac80/
+          data_rack = json.loads(rack_query.data.decode('utf-8'))
+
+          # rack_display = device['rack'].get('name', 'N/A')
           rack_url = device['rack'].get('url', '').replace("/api/", "/", 1)
-          rack_info = f"[Rack: {rack_display} - {rack_id}]({rack_url})" if rack_url else str(rack_id)
+          rack_info = f"Rack:\t[{data_rack['name']}]({rack_url})" if rack_url else str(rack_id)
 
         k8s_version = "N/A"
         if device.get('custom_fields') and device['custom_fields'] is not None:
@@ -49,6 +59,7 @@ def get_nautobot_devices(node):
         nautobot_devices.append(f"""
 Device name: [{device.get('name', 'Unknown')}]({device.get('url', '')})
 {rack_info}
+Position: {device['position']}
 Kubernetes version: {k8s_version}
 """)
     return nautobot_devices
