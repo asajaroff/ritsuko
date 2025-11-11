@@ -279,7 +279,7 @@ class TestHandleMessage(unittest.TestCase):
 
     @patch('bot.send_message')
     def test_handle_message_one_on_one_pm_without_mention(self, mock_send):
-        """Test that bot ignores 1-on-1 PMs when not mentioned."""
+        """Test that bot responds to 1-on-1 PMs even when not mentioned."""
         message = {
             'sender_email': 'asajaroff@een.com',
             'content': 'status',
@@ -293,8 +293,11 @@ class TestHandleMessage(unittest.TestCase):
 
         bot.handle_message(message)
 
-        # Should not send a message since bot was not mentioned
-        mock_send.assert_not_called()
+        # Bot should respond in 1-on-1 conversations even without mention
+        mock_send.assert_called_once()
+        call_args = mock_send.call_args[0][0]
+        self.assertEqual(call_args['type'], 'private')
+        self.assertIn('asajaroff@een.com', call_args['to'])
 
     @patch('bot.send_message')
     def test_handle_message_stream_without_mention(self, mock_send):

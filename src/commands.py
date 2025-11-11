@@ -117,7 +117,7 @@ def handle_nautobot(args):
     all_devices.extend(devices)
 
   result = '\n'.join(all_devices)
-  return result if result else "No devices found."
+  return result
 
 def handle_version(message, args):
     """Handle the version command."""

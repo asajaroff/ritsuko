@@ -62,7 +62,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Updated Makefile `test-coverage` target: changed to `python -m pytest tests/ -v --cov=src --cov-report=term-missing`
   - All 52 tests pass successfully in new location
 
+### Security
+
+- **Removed hardcoded credentials from run.sh**
+  - Removed exposed API keys and tokens (Zulip, GitHub, Nautobot) from `run.sh`
+  - Updated `run.sh` to load credentials from `.env` file instead
+  - Added `.env.example` template file with placeholder values for all required environment variables
+  - Added `run.sh` to `.gitignore` to prevent future credential leaks
+  - Note: Nautobot token was found in git history (commits db5cfd7, a8cf03a) and should be rotated
+
 ### Fixed
+
+- **Nautobot API error handling** (`src/fetchers.py`)
+  - Fixed KeyError on missing `position` field: changed `device['position']` to `device.get('position', 'N/A')`
+  - Fixed KeyError on missing rack `name` field: changed `data_rack['name']` to `data_rack.get('name', str(rack_id))`
+  - Improved robustness when handling incomplete device data from Nautobot API
+
+- **Nautobot command return value** (`src/commands.py`)
+  - Fixed `handle_nautobot()` to return empty string when no devices found (previously returned "No devices found.")
+  - Ensures consistent behavior with test expectations
+
+- **1-on-1 PM test expectations** (`tests/test_bot.py`)
+  - Updated `test_handle_message_one_on_one_pm_without_mention` to correctly expect bot responses in 1-on-1 conversations
+  - Test now aligns with documented bot behavior: bot always responds in 1-on-1 PMs, even without explicit mention
+  - All 54 unit tests now pass successfully
 
 - **Private message mention detection** (`src/bot.py`, `tests/test_bot.py`)
   - Fixed critical bug where bot was responding to private messages without being mentioned
