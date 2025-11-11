@@ -89,6 +89,8 @@ class TestHandleMessage(unittest.TestCase):
         self.mock_client = MagicMock()
         bot.client = self.mock_client
         os.environ['ZULIP_EMAIL'] = 'bot@example.com'
+        # Set up bot profile with a fixed user_id for testing
+        bot.BOT_PROFILE = {'user_id': 12345, 'full_name': 'Ritsuko', 'email': 'bot@example.com'}
 
     @patch('bot.send_message')
     def test_handle_message_from_bot_itself(self, mock_send):
@@ -105,13 +107,14 @@ class TestHandleMessage(unittest.TestCase):
 
     @patch('bot.send_message')
     def test_handle_message_authorized_user_private(self, mock_send):
-        """Test handling message from authorized user in private chat."""
+        """Test handling message from authorized user in private chat with mention."""
         mock_send.return_value = True
 
         message = {
             'sender_email': 'asajaroff@een.com',
-            'content': 'status',
+            'content': '@**Ritsuko** status',
             'type': 'private',
+            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
             'display_recipient': [
                 {'email': 'asajaroff@een.com'},
                 {'email': 'bot@example.com'}
@@ -127,13 +130,14 @@ class TestHandleMessage(unittest.TestCase):
 
     @patch('bot.send_message')
     def test_handle_message_authorized_user_stream(self, mock_send):
-        """Test handling message from authorized user in stream."""
+        """Test handling message from authorized user in stream with mention."""
         mock_send.return_value = True
 
         message = {
             'sender_email': 'asajaroff@een.com',
             'content': '@bot status',
             'type': 'stream',
+            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
             'display_recipient': 'general',
             'subject': 'test topic'
         }
@@ -149,13 +153,14 @@ class TestHandleMessage(unittest.TestCase):
 
     @patch('bot.send_message')
     def test_handle_message_unauthorized_user_private(self, mock_send):
-        """Test handling message from unauthorized user in private chat."""
+        """Test handling message from unauthorized user in private chat with mention."""
         mock_send.return_value = True
 
         message = {
             'sender_email': 'unauthorized@example.com',
-            'content': 'Hello bot',
+            'content': '@**Ritsuko** Hello bot',
             'type': 'private',
+            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
             'display_recipient': [
                 {'email': 'unauthorized@example.com'},
                 {'email': 'bot@example.com'}
@@ -170,13 +175,14 @@ class TestHandleMessage(unittest.TestCase):
 
     @patch('bot.send_message')
     def test_handle_message_unauthorized_user_stream(self, mock_send):
-        """Test handling message from unauthorized user in stream."""
+        """Test handling message from unauthorized user in stream with mention."""
         mock_send.return_value = True
 
         message = {
             'sender_email': 'unauthorized@example.com',
-            'content': 'Hello bot',
+            'content': '@bot Hello bot',
             'type': 'stream',
+            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
             'display_recipient': 'general',
             'subject': 'test topic'
         }
@@ -205,12 +211,11 @@ class TestHandleMessage(unittest.TestCase):
     @patch('bot.send_message')
     def test_handle_message_group_pm_without_mention(self, mock_send):
         """Test that bot ignores group PMs when not mentioned."""
-        bot.client.get_profile = MagicMock(return_value={'full_name': 'Ritsuko'})
-
         message = {
             'sender_email': 'asajaroff@een.com',
             'content': 'status',
             'type': 'private',
+            'mentioned_user_ids': [],  # Bot not mentioned
             'display_recipient': [
                 {'email': 'asajaroff@een.com'},
                 {'email': 'miniguez@een.com'},
@@ -227,12 +232,12 @@ class TestHandleMessage(unittest.TestCase):
     def test_handle_message_group_pm_with_mention(self, mock_send):
         """Test that bot responds to group PMs when mentioned."""
         mock_send.return_value = True
-        bot.client.get_profile = MagicMock(return_value={'full_name': 'Ritsuko'})
 
         message = {
             'sender_email': 'asajaroff@een.com',
             'content': '@**Ritsuko** status',
             'type': 'private',
+            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
             'display_recipient': [
                 {'email': 'asajaroff@een.com'},
                 {'email': 'miniguez@een.com'},
@@ -249,14 +254,15 @@ class TestHandleMessage(unittest.TestCase):
         self.assertIn('running normally', call_args['content'])
 
     @patch('bot.send_message')
-    def test_handle_message_one_on_one_pm(self, mock_send):
-        """Test that bot responds to 1-on-1 PMs without mention."""
+    def test_handle_message_one_on_one_pm_with_mention(self, mock_send):
+        """Test that bot responds to 1-on-1 PMs when mentioned."""
         mock_send.return_value = True
 
         message = {
             'sender_email': 'asajaroff@een.com',
-            'content': 'status',
+            'content': '@**Ritsuko** status',
             'type': 'private',
+            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
             'display_recipient': [
                 {'email': 'asajaroff@een.com'},
                 {'email': 'bot@example.com'}
@@ -265,11 +271,47 @@ class TestHandleMessage(unittest.TestCase):
 
         bot.handle_message(message)
 
-        # Should send a message in 1-on-1 PM without mention required
+        # Should send a message when bot is mentioned
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
         self.assertEqual(call_args['type'], 'private')
         self.assertIn('running normally', call_args['content'])
+
+    @patch('bot.send_message')
+    def test_handle_message_one_on_one_pm_without_mention(self, mock_send):
+        """Test that bot ignores 1-on-1 PMs when not mentioned."""
+        message = {
+            'sender_email': 'asajaroff@een.com',
+            'content': 'status',
+            'type': 'private',
+            'mentioned_user_ids': [],  # Bot not mentioned
+            'display_recipient': [
+                {'email': 'asajaroff@een.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        bot.handle_message(message)
+
+        # Should not send a message since bot was not mentioned
+        mock_send.assert_not_called()
+
+    @patch('bot.send_message')
+    def test_handle_message_stream_without_mention(self, mock_send):
+        """Test that bot ignores stream messages when not mentioned."""
+        message = {
+            'sender_email': 'asajaroff@een.com',
+            'content': 'status',
+            'type': 'stream',
+            'mentioned_user_ids': [],  # Bot not mentioned
+            'display_recipient': 'general',
+            'subject': 'test topic'
+        }
+
+        bot.handle_message(message)
+
+        # Should not send a message since bot was not mentioned
+        mock_send.assert_not_called()
 
 
 class TestCommandParsing(unittest.TestCase):

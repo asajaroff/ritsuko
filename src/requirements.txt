@@ -18,3 +18,4 @@ zulip_bots==0.9.1
 # Testing dependencies
 pytest==8.3.4
 pytest-cov==6.0.0
+pytest-timeout==2.3.1

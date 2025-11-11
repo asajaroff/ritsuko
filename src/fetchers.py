@@ -10,8 +10,6 @@ def get_nautobot_devices(node):
     http = urllib3.PoolManager()
     nautobot_token = environ.get('NAUTOBOT_TOKEN', None)
     nautobot_url = environ.get('NAUTOBOT_URL', "https://nautobot.eencloud.com/api")
-    # nautobot_token = "4a623f14427953a4e87d7cc2a7cdde1ba8b406ec"
-    # nautobot_url = "https://nautobot.eencloud.com/api"
     nautobot_headers =  {
       "Accept": "application/json; version=2.0; indent=4",
       "Authorization": f"Token {nautobot_token}",

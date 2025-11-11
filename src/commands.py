@@ -35,9 +35,9 @@ def parse_command(message):
         args = words[2:] if len(words) > 2 else []
     else:  # private message
         # In private messages, first word is the command
-        # Unless it's a bot mention (e.g., @**BotName**), then second word is the command
+        # Unless it's a bot mention (e.g., @**BotName** or @_**BotName**), then second word is the command
         start_idx = 0
-        if words[0].startswith('@**') and words[0].endswith('**'):
+        if (words[0].startswith('@**') or words[0].startswith('@_**')) and words[0].endswith('**'):
             # First word is a bot mention, skip it
             start_idx = 1
 

@@ -15,6 +15,9 @@ logging.basicConfig(
 
 RITSUKO_VERSION = 'local-dev'
 
+# Cache bot profile to avoid repeated API calls
+BOT_PROFILE = None
+
 #Set up tools
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', None)
 
@@ -95,74 +98,75 @@ def send_message(message_dict):
         return False
 
 def handle_message(message):
-    """Handle incoming Zulip messages with error handling."""
+    """Handle incoming Zulip messages. Only responds when bot is mentioned."""
     try:
         # Ignore messages from the bot itself
         if message['sender_email'] == os.environ['ZULIP_EMAIL']:
-            logging.debug('Ignoring own message')
             return
 
-        if message['sender_email'] in authorized_users:
-            logging.info(f'{message['sender_email']}: {message['content']}' )
+        # Debug logging
+        bot_user_id = BOT_PROFILE['user_id']
+        mentioned_user_ids = message.get('mentioned_user_ids', [])
+        msg_type = message.get('type', 'unknown')
+        content = message.get('content', '')
 
-            # For private messages with multiple recipients, only respond if bot is mentioned
-            if message['type'] == 'private':
-                # Check if this is a group PM (more than 2 participants including the bot)
-                recipients = message['display_recipient']
-                is_group_pm = len(recipients) > 2
+        logging.debug(f'Message type: {msg_type}, Bot ID: {bot_user_id}, Mentioned IDs: {mentioned_user_ids}')
+        logging.debug(f'Message content: {content}')
 
-                # In group PMs, only respond if bot is mentioned
-                if is_group_pm:
-                    bot_mention = f"@**{client.get_profile()['full_name']}**"
-                    if bot_mention not in message['content']:
-                        logging.debug(f'Ignoring group PM without bot mention')
-                        return
+        # For private messages, always respond (they're sent directly to the bot)
+        # For stream messages, only respond if bot is mentioned
+        if msg_type == 'stream':
+            # Check both mentioned_user_ids and content for bot mention
+            bot_mentioned = (bot_user_id in mentioned_user_ids or
+                           '@**Ritsuko**' in content or
+                           '@_**Ritsuko**' in content)
+            if not bot_mentioned:
+                logging.debug(f'Ignoring stream message without mention')
+                return
 
-            # Execute command and get response
+        # Log the message
+        logging.info(f'{message["sender_email"]}: {message["content"]}')
+
+        # Check authorization
+        if message['sender_email'] not in authorized_users:
+            logging.warning(f'Unauthorized user: {message["sender_email"]}')
+            response = 'I am not authorized to talk to you'
+        else:
             response = execute_command(message)
 
-            if message['type'] == 'private':
-                send_message(dict(
-                    type='private',
-                    to=[r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
-                    content=response
-                ))
+        # Send response
+        if message['type'] == 'private':
+            send_message({
+                'type': 'private',
+                'to': [r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
+                'content': response
+            })
+        elif message['type'] == 'stream':
+            send_message({
+                'type': 'stream',
+                'to': message['display_recipient'],
+                'subject': message['subject'],
+                'content': response
+            })
 
-            elif message['type'] == 'stream':
-                send_message(dict(
-                    type='stream',
-                    to=message['display_recipient'],
-                    subject=message['subject'],
-                    content=response
-                ))
-
-        else:
-            logging.warning(f'Ignoring message from {message['sender_email']} -- msg: {message['content']}' )
-            if message['type'] == 'private':
-                send_message(dict(
-                    type='private',
-                    to=[r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
-                    content='I am not authorized to talk to you'
-                ))
-
-            elif message['type'] == 'stream':
-                send_message(dict(
-                    type='stream',
-                    to=message['display_recipient'],
-                    subject=message['subject'],
-                    content='I am not authorized to talk to you'
-                ))
-
-    except KeyError as e:
-        logging.error(f'Missing expected field in message: {e}')
     except Exception as e:
-        logging.error(f'Unexpected error handling message: {e}')
+        logging.error(f'Error handling message: {e}')
 
 
 def main():
     """Main function to run the bot."""
+    global BOT_PROFILE
+
     # Start health check server
     start_health_server(port=8080)
+
+    # Get bot profile once at startup
+    try:
+        BOT_PROFILE = client.get_profile()
+        logging.info(f'Bot profile loaded: {BOT_PROFILE.get("full_name")} (ID: {BOT_PROFILE.get("user_id")})')
+    except Exception as e:
+        logging.error(f'Failed to get bot profile: {e}')
+        sys.exit(1)
 
     # Subscribe to messages
     logging.info('Starting Zulip bot...')
