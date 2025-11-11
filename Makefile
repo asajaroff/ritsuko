@@ -19,11 +19,19 @@ help: ## Show this help
 
 
 .PHONY: build
-build:
+build: ## Build production Docker image
 	docker build \
 		--progress=plain \
 		-t $(IMAGE) \
 		-t $(IMAGE_UNIQ) \
+		.
+
+.PHONY: build-debug
+build-debug: ## Build debug Docker image with testing tools
+	docker build \
+		--progress=plain \
+		-f Dockerfile.debug \
+		-t $(IMAGE_NAME):debug-$(UNIQ) \
 		. 
 
 .PHONY: push
@@ -55,7 +63,7 @@ dev: ## Runs the container locally
 		-e LOG_LEVEL=INFO \
 		$(IMAGE_UNIQ)
 
-debug: ## Runs the container locally in debug mode
+debug: build-debug ## Runs the debug container locally with debug tools
 	docker run -ti \
 		-v $(HOME)/.kube:/home/zulip/.kube \
 		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
@@ -65,7 +73,7 @@ debug: ## Runs the container locally in debug mode
 		-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
 		-e ZULIP_SITE=$(ZULIP_SITE) \
 		-e LOG_LEVEL=DEBUG \
-		$(IMAGE)
+		$(IMAGE_NAME):debug-$(UNIQ)
 
 
 local:
@@ -73,11 +81,21 @@ local:
 	./run.sh
 
 test: ## Run unit tests
-	@if [ ! -d .venv ]; then echo "Virtual environment not found. Creating it..."; python3 -m venv .venv; .venv/bin/pip install -r src/requirements.txt; fi
+	@if [ ! -d .venv ]; then \
+		echo "Virtual environment not found. Creating it..."; \
+		python3 -m venv .venv; \
+		.venv/bin/pip install -r src/requirements.txt; \
+		.venv/bin/pip install -r src/requirements-test.txt; \
+	fi
 	.venv/bin/python -m pytest tests/test_bot.py tests/test_fetcher.py -v
 
 test-coverage: ## Run tests with coverage report
-	@if [ ! -d .venv ]; then echo "Virtual environment not found. Creating it..."; python3 -m venv .venv; .venv/bin/pip install -r src/requirements.txt; fi
+	@if [ ! -d .venv ]; then \
+		echo "Virtual environment not found. Creating it..."; \
+		python3 -m venv .venv; \
+		.venv/bin/pip install -r src/requirements.txt; \
+		.venv/bin/pip install -r src/requirements-test.txt; \
+	fi
 	.venv/bin/python -m pytest tests/test_bot.py tests/test_fetcher.py -v --cov=src --cov-report=term-missing
 
 test-integration: ## Run integration tests against live bot

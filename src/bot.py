@@ -3,6 +3,7 @@ import logging
 import zulip
 import sys
 import threading
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from commands import execute_command
 
@@ -28,15 +29,8 @@ if missing_vars:
     logging.error(f'Missing required environment variables: {", ".join(missing_vars)}')
     sys.exit(1)
 
-try:
-    client = zulip.Client(
-        email=os.environ['ZULIP_EMAIL'],
-        api_key=os.environ['ZULIP_API_KEY'],
-        site=os.environ['ZULIP_SITE']
-    )
-except Exception as e:
-    logging.error(f'Failed to initialize Zulip client: {e}')
-    sys.exit(1)
+# Initialize client as None - will be set in main() with retry logic
+client = None
 
 authorized_users = [
     'asajaroff@een.com',
@@ -204,21 +198,38 @@ def handle_message(message):
 
 def main():
     """Main function to run the bot."""
-    global BOT_PROFILE
+    global BOT_PROFILE, client
 
-    # Start health check server
+    # Start health check server first so K8s doesn't kill us during initialization
     start_health_server(port=8080)
 
-    # Get bot profile once at startup
-    try:
-        BOT_PROFILE = client.get_profile()
-        logging.info(f'Bot profile loaded: {BOT_PROFILE.get("full_name")} (ID: {BOT_PROFILE.get("user_id")})')
-    except Exception as e:
-        logging.error(f'Failed to get bot profile: {e}')
-        sys.exit(1)
+    # Initialize Zulip client with retry logic
+    max_retries = 5
+    retry_delay = 10  # seconds
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logging.info(f'Attempting to connect to Zulip (attempt {attempt}/{max_retries})...')
+            client = zulip.Client(
+                email=os.environ['ZULIP_EMAIL'],
+                api_key=os.environ['ZULIP_API_KEY'],
+                site=os.environ['ZULIP_SITE']
+            )
+            # Test connection by getting profile
+            BOT_PROFILE = client.get_profile()
+            logging.info(f'Successfully connected! Bot profile: {BOT_PROFILE.get("full_name")} (ID: {BOT_PROFILE.get("user_id")})')
+            break
+        except Exception as e:
+            logging.error(f'Failed to initialize Zulip client (attempt {attempt}/{max_retries}): {e}')
+            if attempt < max_retries:
+                logging.info(f'Retrying in {retry_delay} seconds...')
+                time.sleep(retry_delay)
+            else:
+                logging.error('Max retries reached. Exiting.')
+                sys.exit(1)
 
     # Subscribe to messages
-    logging.info('Starting Zulip bot...')
+    logging.info('Starting Zulip bot message loop...')
     try:
         client.call_on_each_message(handle_message)
     except KeyboardInterrupt:

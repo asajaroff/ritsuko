@@ -1,0 +1,28 @@
+FROM python:3.13-slim-bookworm
+
+# Install system dependencies including network debugging tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        dnsutils \
+        iputils-ping \
+        vim \
+        net-tools && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install things needed for the bot - order IS important
+COPY ./src/requirements.txt ./requirements.txt
+COPY ./src/requirements-test.txt ./requirements-test.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt && \
+    pip install --no-cache-dir --break-system-packages -r requirements-test.txt
+
+# Create bot user
+RUN useradd -m -s /bin/bash zulip-bot
+WORKDIR /home/zulip-bot
+COPY --chown=zulip-bot:zulip-bot ./src/ ./
+USER zulip-bot
+
+ENV RITSUKO_VERSION='v1.0.0-debug'
+
+CMD ["python3", "bot.py"]

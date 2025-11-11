@@ -1,14 +1,6 @@
 FROM python:3.13-slim-bookworm
 
-# Install system dependencies
-#RUN apt-get update && \
-#    apt-get install -y --no-install-recommends \
-#        python3 \
-#	 python3.13-venv \
-#        python3-pip \
-#        wget && \
-#    apt-get clean && \
-#    rm -rf /var/lib/apt/lists/*
+# No additional system dependencies needed for production
 
 # Install things needed for the bot - order IS important
 COPY ./src/requirements.txt ./requirements.txt
