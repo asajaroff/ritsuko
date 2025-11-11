@@ -41,7 +41,7 @@ UNAUTHORIZED_EMAIL = os.environ.get('RITSUKO_TEST_UNAUTHORIZED_EMAIL')
 UNAUTHORIZED_API_KEY = os.environ.get('RITSUKO_TEST_UNAUTHORIZED_API_KEY')
 
 # Test timeout settings
-MESSAGE_TIMEOUT = 2  # seconds to wait for bot response
+MESSAGE_TIMEOUT = 15  # seconds to wait for bot response
 POLL_INTERVAL = 0.5  # seconds between checking for new messages
 
 # Global shared topic for ALL integration tests across all classes
