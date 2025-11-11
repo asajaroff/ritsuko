@@ -98,13 +98,19 @@ def send_message(message_dict):
         return False
 
 def handle_message(message):
-    """Handle incoming Zulip messages. Only responds when bot is mentioned."""
+    """
+    Handle incoming Zulip messages with the following behavior:
+    - Always reply when tagged with @
+    - In public/private streams: never reply if not tagged
+    - In private conversations with 3+ users (including bot): don't reply unless tagged
+    - In 1-on-1 conversations: always reply, even without tag
+    """
     try:
         # Ignore messages from the bot itself
         if message['sender_email'] == os.environ['ZULIP_EMAIL']:
             return
 
-        # Debug logging
+        # Get message metadata
         bot_user_id = BOT_PROFILE['user_id']
         mentioned_user_ids = message.get('mentioned_user_ids', [])
         msg_type = message.get('type', 'unknown')
@@ -113,16 +119,51 @@ def handle_message(message):
         logging.debug(f'Message type: {msg_type}, Bot ID: {bot_user_id}, Mentioned IDs: {mentioned_user_ids}')
         logging.debug(f'Message content: {content}')
 
-        # For private messages, always respond (they're sent directly to the bot)
-        # For stream messages, only respond if bot is mentioned
+        # Check if bot is mentioned
+        bot_mentioned = (bot_user_id in mentioned_user_ids or
+                        '@**Ritsuko**' in content or
+                        '@_**Ritsuko**' in content)
+
+        # Determine if we should respond based on message type and context
+        should_respond = False
+
         if msg_type == 'stream':
-            # Check both mentioned_user_ids and content for bot mention
-            bot_mentioned = (bot_user_id in mentioned_user_ids or
-                           '@**Ritsuko**' in content or
-                           '@_**Ritsuko**' in content)
-            if not bot_mentioned:
-                logging.debug(f'Ignoring stream message without mention')
+            # Public streams: only respond if bot is mentioned
+            if bot_mentioned:
+                should_respond = True
+                logging.debug('Responding to stream message with mention')
+            else:
+                logging.debug('Ignoring stream message without mention')
                 return
+
+        elif msg_type == 'private':
+            display_recipient = message.get('display_recipient', [])
+
+            # Count non-bot users in the conversation
+            non_bot_users = [r for r in display_recipient if r['email'] != os.environ['ZULIP_EMAIL']]
+            num_non_bot_users = len(non_bot_users)
+
+            logging.debug(f'Private message with {num_non_bot_users} non-bot user(s)')
+
+            if num_non_bot_users == 1:
+                # 1-on-1 conversation: always respond
+                should_respond = True
+                logging.debug('Responding to 1-on-1 private message')
+            else:
+                # Group private conversation: only respond if mentioned
+                if bot_mentioned:
+                    should_respond = True
+                    logging.debug('Responding to group private message with mention')
+                else:
+                    logging.debug('Ignoring group private message without mention')
+                    return
+        else:
+            logging.debug(f'Unknown message type: {msg_type}')
+            return
+
+        # If we shouldn't respond, exit early
+        if not should_respond:
+            return
 
         # Log the message
         logging.info(f'{message["sender_email"]}: {message["content"]}')

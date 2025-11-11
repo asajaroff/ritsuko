@@ -41,7 +41,7 @@ UNAUTHORIZED_EMAIL = os.environ.get('RITSUKO_TEST_UNAUTHORIZED_EMAIL')
 UNAUTHORIZED_API_KEY = os.environ.get('RITSUKO_TEST_UNAUTHORIZED_API_KEY')
 
 # Test timeout settings
-MESSAGE_TIMEOUT = 30  # seconds to wait for bot response
+MESSAGE_TIMEOUT = 2  # seconds to wait for bot response
 POLL_INTERVAL = 0.5  # seconds between checking for new messages
 
 # Global shared topic for ALL integration tests across all classes
@@ -81,21 +81,6 @@ class BaseIntegrationTest(unittest.TestCase):
         except Exception as e:
             raise unittest.SkipTest(f'Failed to get bot info: {e}')
 
-    def setUp(self):
-        """Send a test marker message before each test."""
-        # Send a marker message to the shared conversation to identify this test
-        test_name = self.id()  # Full test name including class
-        marker_message = {
-            'type': 'stream',
-            'to': RITSUKO_TEST_STREAM,
-            'subject': SHARED_TOPIC,
-            'content': f'---\n**Starting Test:** `{test_name}`\n**Time:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n---'
-        }
-        try:
-            self.client.send_message(marker_message)
-        except Exception:
-            # Don't fail the test if marker message fails
-            pass
 
     def send_private_message(self, content):
         """

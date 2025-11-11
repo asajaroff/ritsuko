@@ -1,6 +1,6 @@
 IMAGE_NAME=harbor.eencloud.com/test/ritsuko
 UNIQ=$(shell git rev-parse --short HEAD)
-IMAGE_TAG=v1.2.1
+IMAGE_TAG=v1.2.2
 IMAGE_TAG_UNIQ= $(IMAGE_TAG)-$(UNIQ)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)
@@ -53,7 +53,7 @@ dev: ## Runs the container locally
 		-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
 		-e ZULIP_SITE=$(ZULIP_SITE) \
 		-e LOG_LEVEL=INFO \
-		$(IMAGE)
+		$(IMAGE_UNIQ)
 
 debug: ## Runs the container locally in debug mode
 	docker run -ti \
@@ -81,8 +81,8 @@ test-coverage: ## Run tests with coverage report
 	.venv/bin/python -m pytest tests/test_bot.py tests/test_fetcher.py -v --cov=src --cov-report=term-missing
 
 test-integration: ## Run integration tests against live bot
-	@if [ ! -f .env.test ]; then echo "Error: .env.test not found. Copy .env.test.example and configure it."; exit 1; fi
-	./run_integration_tests.sh
+	@if [ ! -f tests/.env.test ]; then echo "Error: .env.test not found. Copy .env.test.example and configure it."; exit 1; fi
+	./tests/run_integration_tests.sh
 
 test-integration-verbose: ## Run integration tests with verbose output
 	@if [ ! -f .env.test ]; then echo "Error: .env.test not found. Copy .env.test.example and configure it."; exit 1; fi
