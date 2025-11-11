@@ -108,11 +108,16 @@ c031  - aus2p1
 """
 
 def handle_nautobot(args):
+  if not args:
+    return "Usage: `nautobot <node>` - Please provide node name."
+
   all_devices = []
   for node in args:
     devices = get_nautobot_devices(node)
     all_devices.extend(devices)
-  return '\n'.join(all_devices) 
+
+  result = '\n'.join(all_devices)
+  return result if result else "No devices found."
 
 def handle_version(message, args):
     """Handle the version command."""
