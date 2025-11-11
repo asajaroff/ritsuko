@@ -137,6 +137,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Integration test timeout handling** (`tests/test_integration.py`)
+  - Fixed `send_and_wait()` method to accept optional `timeout` parameter
+  - Resolves 4 failing AI command integration tests that required longer timeouts (15-20 seconds)
+  - Tests affected:
+    - `test_ai_command_simple_prompt_private`
+    - `test_ai_command_simple_prompt_stream`
+    - `test_ai_command_response_time`
+    - `test_ai_command_multiple_words_prompt`
+  - Default timeout remains MESSAGE_TIMEOUT (2 seconds) for backward compatibility
+  - All 27 integration tests now pass successfully (6 skipped due to optional configuration)
+
 - **Nautobot API error handling** (`src/fetchers.py`)
   - Fixed KeyError on missing `position` field: changed `device['position']` to `device.get('position', 'N/A')`
   - Fixed KeyError on missing rack `name` field: changed `data_rack['name']` to `data_rack.get('name', str(rack_id))`

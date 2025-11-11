@@ -162,7 +162,7 @@ class BaseIntegrationTest(unittest.TestCase):
 
         return None
 
-    def send_and_wait(self, content, message_type='private', stream=None, topic=None):
+    def send_and_wait(self, content, message_type='private', stream=None, topic=None, timeout=None):
         """
         Send a message and wait for bot response.
 
@@ -171,6 +171,7 @@ class BaseIntegrationTest(unittest.TestCase):
             message_type: 'private' or 'stream'
             stream: Stream name (for stream messages)
             topic: Topic name (for stream messages)
+            timeout: Maximum seconds to wait for response (defaults to MESSAGE_TIMEOUT)
 
         Returns:
             str: Bot response content
@@ -180,10 +181,13 @@ class BaseIntegrationTest(unittest.TestCase):
         else:
             result = self.send_stream_message(content, stream, topic)
 
-        response = self.wait_for_bot_response(result['id'])
+        if timeout is None:
+            timeout = MESSAGE_TIMEOUT
+
+        response = self.wait_for_bot_response(result['id'], timeout=timeout)
         self.assertIsNotNone(
             response,
-            f'Bot did not respond within {MESSAGE_TIMEOUT} seconds to: {content}'
+            f'Bot did not respond within {timeout} seconds to: {content}'
         )
         return response
 
