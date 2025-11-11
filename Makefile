@@ -74,11 +74,21 @@ local:
 
 test: ## Run unit tests
 	@if [ ! -d .venv ]; then echo "Virtual environment not found. Creating it..."; python3 -m venv .venv; .venv/bin/pip install -r src/requirements.txt; fi
-	.venv/bin/python -m pytest tests/ -v
+	.venv/bin/python -m pytest tests/test_bot.py tests/test_fetcher.py -v
 
 test-coverage: ## Run tests with coverage report
 	@if [ ! -d .venv ]; then echo "Virtual environment not found. Creating it..."; python3 -m venv .venv; .venv/bin/pip install -r src/requirements.txt; fi
-	.venv/bin/python -m pytest tests/ -v --cov=src --cov-report=term-missing
+	.venv/bin/python -m pytest tests/test_bot.py tests/test_fetcher.py -v --cov=src --cov-report=term-missing
+
+test-integration: ## Run integration tests against live bot
+	@if [ ! -f .env.test ]; then echo "Error: .env.test not found. Copy .env.test.example and configure it."; exit 1; fi
+	./run_integration_tests.sh
+
+test-integration-verbose: ## Run integration tests with verbose output
+	@if [ ! -f .env.test ]; then echo "Error: .env.test not found. Copy .env.test.example and configure it."; exit 1; fi
+	./run_integration_tests.sh -v
+
+test-all: test test-integration ## Run all tests (unit and integration)
 
 echo:
 	@echo $(IMAGE_UNIQ)
