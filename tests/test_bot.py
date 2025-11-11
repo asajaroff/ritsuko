@@ -21,7 +21,7 @@ os.environ['GITHUB_MATCHBOX_TOKEN'] = 'test_github_token'
 sys.modules['zulip'] = MagicMock()
 
 import bot
-from commands import parse_command, execute_command, handle_nautobot
+from commands import parse_command, execute_command, handle_nautobot, handle_ai
 from fetchers import get_nautobot_devices
 from nodes import handle_node
 
@@ -1128,6 +1128,204 @@ class TestNodeCommandEnhanced(unittest.TestCase):
 
         self.assertIn('Usage', result)
         self.assertIn('node <node>', result)
+
+
+class TestAICommand(unittest.TestCase):
+    """Test the AI command functionality."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        # Set the ANTHROPIC_API_KEY for tests
+        os.environ['ANTHROPIC_API_KEY'] = 'test_anthropic_key'
+
+    def tearDown(self):
+        """Clean up after tests."""
+        # Clean up environment variable
+        if 'ANTHROPIC_API_KEY' in os.environ:
+            del os.environ['ANTHROPIC_API_KEY']
+
+    def test_handle_ai_no_anthropic_key(self):
+        """Test AI command without ANTHROPIC_API_KEY set."""
+        del os.environ['ANTHROPIC_API_KEY']
+
+        message = {
+            'type': 'private',
+            'content': 'ai What is the capital of France?'
+        }
+
+        response = handle_ai(message, ['What', 'is', 'the', 'capital', 'of', 'France?'])
+
+        self.assertIn('not available', response)
+        self.assertIn('ANTHROPIC_API_KEY', response)
+
+    def test_handle_ai_no_args(self):
+        """Test AI command without arguments."""
+        message = {
+            'type': 'private',
+            'content': 'ai'
+        }
+
+        response = handle_ai(message, [])
+
+        self.assertIn('Usage', response)
+        self.assertIn('provide a prompt', response)
+
+    @patch('commands.anthropic.Anthropic')
+    def test_handle_ai_success(self, mock_anthropic_class):
+        """Test successful AI command execution."""
+        # Mock the Anthropic client and response
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+
+        mock_response = MagicMock()
+        mock_content = MagicMock()
+        mock_content.text = "The capital of France is Paris."
+        mock_response.content = [mock_content]
+        mock_client.messages.create.return_value = mock_response
+
+        message = {
+            'type': 'private',
+            'content': 'ai What is the capital of France?',
+            'display_recipient': [
+                {'email': 'test@example.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        response = handle_ai(message, ['What', 'is', 'the', 'capital', 'of', 'France?'])
+
+        self.assertEqual(response, "The capital of France is Paris.")
+        mock_client.messages.create.assert_called_once()
+
+    @patch('commands.anthropic.Anthropic')
+    def test_handle_ai_empty_response(self, mock_anthropic_class):
+        """Test AI command with empty response."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+
+        mock_response = MagicMock()
+        mock_response.content = []
+        mock_client.messages.create.return_value = mock_response
+
+        message = {
+            'type': 'private',
+            'content': 'ai test',
+            'display_recipient': [
+                {'email': 'test@example.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        response = handle_ai(message, ['test'])
+
+        self.assertIn('empty response', response)
+
+    @patch('commands.anthropic.Anthropic')
+    def test_handle_ai_api_error(self, mock_anthropic_class):
+        """Test AI command with API error."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+        mock_client.messages.create.side_effect = Exception('API Error')
+
+        message = {
+            'type': 'private',
+            'content': 'ai test',
+            'display_recipient': [
+                {'email': 'test@example.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        response = handle_ai(message, ['test'])
+
+        self.assertIn('error occurred', response)
+        self.assertIn('API Error', response)
+
+    @patch('commands.anthropic.Anthropic')
+    def test_handle_ai_with_callback(self, mock_anthropic_class):
+        """Test AI command with send_message callback for long-running requests."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+
+        # Simulate a slow response
+        def slow_create(*args, **kwargs):
+            time.sleep(6)  # Sleep for more than 5 seconds to trigger callback
+            mock_response = MagicMock()
+            mock_content = MagicMock()
+            mock_content.text = "Slow response"
+            mock_response.content = [mock_content]
+            return mock_response
+
+        mock_client.messages.create.side_effect = slow_create
+
+        message = {
+            'type': 'private',
+            'content': 'ai test',
+            'display_recipient': [
+                {'email': 'test@example.com'},
+                {'email': 'bot@example.com'}
+            ]
+        }
+
+        callback_called = {'called': False}
+
+        def mock_callback(msg):
+            callback_called['called'] = True
+            self.assertIn('Processing', msg['content'])
+
+        response = handle_ai(message, ['test'], send_message_callback=mock_callback)
+
+        self.assertEqual(response, "Slow response")
+        # Callback should have been called due to 6 second delay
+        self.assertTrue(callback_called['called'])
+
+    @patch('commands.anthropic.Anthropic')
+    def test_handle_ai_stream_message(self, mock_anthropic_class):
+        """Test AI command from stream message."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+
+        mock_response = MagicMock()
+        mock_content = MagicMock()
+        mock_content.text = "Stream response"
+        mock_response.content = [mock_content]
+        mock_client.messages.create.return_value = mock_response
+
+        message = {
+            'type': 'stream',
+            'content': '@bot ai test',
+            'display_recipient': 'general',
+            'subject': 'test topic'
+        }
+
+        response = handle_ai(message, ['test'])
+
+        self.assertEqual(response, "Stream response")
+
+    def test_execute_command_ai(self):
+        """Test AI command through execute_command."""
+        with patch('commands.anthropic.Anthropic') as mock_anthropic_class:
+            mock_client = MagicMock()
+            mock_anthropic_class.return_value = mock_client
+
+            mock_response = MagicMock()
+            mock_content = MagicMock()
+            mock_content.text = "Test AI response"
+            mock_response.content = [mock_content]
+            mock_client.messages.create.return_value = mock_response
+
+            message = {
+                'type': 'private',
+                'content': 'ai test question',
+                'display_recipient': [
+                    {'email': 'test@example.com'},
+                    {'email': 'bot@example.com'}
+                ]
+            }
+
+            response = execute_command(message)
+
+            self.assertEqual(response, "Test AI response")
 
 
 if __name__ == '__main__':

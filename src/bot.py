@@ -173,7 +173,15 @@ def handle_message(message):
             logging.warning(f'Unauthorized user: {message["sender_email"]}')
             response = 'I am not authorized to talk to you'
         else:
-            response = execute_command(message)
+            # Import handle_ai to check if we need to pass callback
+            from commands import parse_command, handle_ai
+            command, args = parse_command(message)
+
+            # For AI command, pass the send_message callback for progress updates
+            if command == 'ai':
+                response = handle_ai(message, args, send_message_callback=send_message)
+            else:
+                response = execute_command(message)
 
         # Send response
         if message['type'] == 'private':

@@ -2,10 +2,20 @@ import logging
 from os import environ
 import urllib3
 import json
+import threading
+import time
 
 from nodes import handle_node
 
 from fetchers import get_nautobot_devices
+
+# Import anthropic for AI functionality
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+    logging.warning("anthropic package not available. AI command will not work.")
 
 def parse_command(message):
     """
@@ -53,7 +63,7 @@ def parse_command(message):
 def handle_help(message, args):
     help_text = """markdown
 **Available Commands:**
-- `ai <prompt>` - Interact with an LLM **TODO**
+- `ai <prompt>` - Interact with an LLM
 - `mcp <prompt>` - Interact with an LLM and MCP servers **TODO**
 - `status` - Get bot status information
 - `clusters` | `clusters <cluster>` - Lists the cluster name and kubernetes cluster name - If a cluster is selected will bring data from that
@@ -69,6 +79,97 @@ Usage:
 ```
 """
     return help_text
+
+
+def handle_ai(message, args, send_message_callback=None):
+    """
+    Handle the AI command to interact with Claude API.
+
+    Args:
+        message: Zulip message dict
+        args: List of arguments passed to the AI command
+        send_message_callback: Optional callback function to send intermediate messages
+
+    Returns:
+        str: AI response or error message
+    """
+    if not ANTHROPIC_AVAILABLE:
+        return "AI functionality is not available. The anthropic package is not installed."
+
+    api_key = environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        return "AI functionality is not available. ANTHROPIC_API_KEY environment variable is not set."
+
+    if not args:
+        return "Usage: `ai <prompt>` - Please provide a prompt for the AI."
+
+    # Join all args into a single prompt
+    prompt = ' '.join(args)
+
+    try:
+        # Send a processing message if we have a callback and it's expected to take time
+        processing_notified = False
+        start_time = time.time()
+
+        # Create a timer to send processing notification after 5 seconds
+        def notify_processing():
+            nonlocal processing_notified
+            if not processing_notified and send_message_callback:
+                processing_notified = True
+                processing_msg = {
+                    'type': message['type'],
+                    'content': 'Processing your request... This may take a moment.'
+                }
+
+                if message['type'] == 'stream':
+                    processing_msg['to'] = message['display_recipient']
+                    processing_msg['subject'] = message['subject']
+                else:  # private
+                    processing_msg['to'] = [r['email'] for r in message['display_recipient']
+                                           if r['email'] != environ.get('ZULIP_EMAIL')]
+
+                send_message_callback(processing_msg)
+
+        timer = None
+        if send_message_callback:
+            timer = threading.Timer(5.0, notify_processing)
+            timer.start()
+
+        # Initialize Anthropic client
+        client = anthropic.Anthropic(api_key=api_key)
+
+        # Call Claude API
+        response = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4096,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        # Cancel the timer if it hasn't fired yet
+        if timer:
+            timer.cancel()
+
+        elapsed_time = time.time() - start_time
+        logging.info(f"AI request completed in {elapsed_time:.2f} seconds")
+
+        # Extract text from response
+        if response.content and len(response.content) > 0:
+            return response.content[0].text
+        else:
+            return "I received an empty response from the AI. Please try again."
+
+    except Exception as e:
+        # Cancel the timer in case of error
+        if timer:
+            timer.cancel()
+
+        logging.error(f"Error in AI command: {e}")
+        return f"An error occurred while processing your AI request: {str(e)}"
 
 
 def handle_status(message, args):
@@ -149,7 +250,7 @@ def execute_command(message):
         case 'help':
             return handle_help(message, args)
         case 'ai':
-            return "AI command is not yet implemented. Coming soon!"
+            return handle_ai(message, args)
         case 'mcp':
             return "MCP command is not yet implemented. Coming soon!"
         case 'node':

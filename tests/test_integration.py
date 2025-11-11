@@ -491,6 +491,98 @@ class TestNautobotCommand(BaseIntegrationTest):
             self.assertIn('Device', response)
 
 
+@pytest.mark.integration
+@pytest.mark.requires_bot
+@pytest.mark.requires_anthropic
+class TestAICommand(BaseIntegrationTest):
+    """Test AI command functionality."""
+
+    def test_ai_command_without_args(self):
+        """Test AI command without arguments."""
+        response = self.send_and_wait('ai')
+        # Should return usage message
+        self.assertIsNotNone(response)
+        self.assertIn('usage', response.lower())
+        self.assertTrue(
+            'ai <prompt>' in response.lower() or 'ai &lt;prompt&gt;' in response.lower(),
+            f"Expected 'ai <prompt>' in response: {response}"
+        )
+
+    @unittest.skipUnless(
+        os.environ.get('ANTHROPIC_API_KEY'),
+        'Set ANTHROPIC_API_KEY to test AI command functionality'
+    )
+    def test_ai_command_simple_prompt_private(self):
+        """Test AI command with simple prompt in private message."""
+        # Use a simple question that should get a quick response
+        response = self.send_and_wait('ai What is 2+2?', timeout=15)
+        self.assertIsNotNone(response)
+        # Response should contain some content (not an error)
+        self.assertGreater(len(response), 0)
+        # Should not contain error messages
+        self.assertNotIn('error occurred', response.lower())
+        self.assertNotIn('not available', response.lower())
+
+    @unittest.skipUnless(
+        os.environ.get('ANTHROPIC_API_KEY'),
+        'Set ANTHROPIC_API_KEY to test AI command functionality'
+    )
+    def test_ai_command_simple_prompt_stream(self):
+        """Test AI command with simple prompt in stream message."""
+        # Use a simple question that should get a quick response
+        response = self.send_and_wait('ai What is the capital of France?', message_type='stream', timeout=15)
+        self.assertIsNotNone(response)
+        # Response should contain some content
+        self.assertGreater(len(response), 0)
+        # Should not contain error messages
+        self.assertNotIn('error occurred', response.lower())
+        self.assertNotIn('not available', response.lower())
+
+    @unittest.skipUnless(
+        os.environ.get('ANTHROPIC_API_KEY'),
+        'Set ANTHROPIC_API_KEY to test AI command functionality'
+    )
+    def test_ai_command_response_time(self):
+        """Test AI command responds within reasonable time."""
+        start_time = time.time()
+        response = self.send_and_wait('ai Say hello', timeout=20)
+        response_time = time.time() - start_time
+
+        self.assertIsNotNone(response)
+        # AI responses might take longer, allow up to 20 seconds
+        self.assertLess(response_time, 20, f'AI response took {response_time:.2f}s, expected < 20s')
+
+    @unittest.skipUnless(
+        os.environ.get('ANTHROPIC_API_KEY'),
+        'Set ANTHROPIC_API_KEY to test AI command functionality'
+    )
+    def test_ai_command_multiple_words_prompt(self):
+        """Test AI command with multi-word prompt."""
+        response = self.send_and_wait('ai Explain what a Kubernetes pod is in one sentence', timeout=20)
+        self.assertIsNotNone(response)
+        self.assertGreater(len(response), 10)
+        # Should mention relevant terms
+        self.assertTrue(
+            'pod' in response.lower() or 'container' in response.lower() or 'kubernetes' in response.lower(),
+            f"Expected relevant content in AI response: {response[:100]}"
+        )
+
+    def test_ai_command_without_api_key_configured(self):
+        """Test AI command behavior when ANTHROPIC_API_KEY is not configured."""
+        # This test verifies the error message when API key is missing
+        # Note: This will only work if the bot doesn't have ANTHROPIC_API_KEY set
+        # If it does have one, the test will be skipped
+        if os.environ.get('ANTHROPIC_API_KEY'):
+            self.skipTest('ANTHROPIC_API_KEY is set, cannot test missing key scenario')
+
+        response = self.send_and_wait('ai test')
+        self.assertIsNotNone(response)
+        self.assertTrue(
+            'not available' in response.lower() or 'not set' in response.lower(),
+            f"Expected error about missing API key in response: {response}"
+        )
+
+
 def run_integration_tests():
     """Run integration tests with detailed output."""
     print('=' * 70)
@@ -521,6 +613,7 @@ def run_integration_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestBotResponseTimes))
     suite.addTests(loader.loadTestsFromTestCase(TestBotEdgeCases))
     suite.addTests(loader.loadTestsFromTestCase(TestNautobotCommand))
+    suite.addTests(loader.loadTestsFromTestCase(TestAICommand))
 
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

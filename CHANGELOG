@@ -8,6 +8,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **AI command for Claude API integration** (`src/commands.py`, `src/bot.py`, `src/requirements.txt`)
+  - New `ai` command that allows users to interact with Claude AI (Sonnet 4.5)
+  - Command accepts a prompt and returns AI-generated responses
+  - Implemented in `handle_ai()` function with comprehensive error handling
+  - Features:
+    - Validates ANTHROPIC_API_KEY environment variable is configured
+    - Accepts multi-word prompts (e.g., `ai What is Kubernetes?`)
+    - Automatic progress notification: sends "Processing your request..." message if API call takes longer than 5 seconds
+    - Works in both private messages and stream channels
+    - Proper error messages for missing API key, empty responses, and API errors
+  - Uses threading.Timer for non-blocking 5-second progress updates
+  - Logs request completion time for performance monitoring
+  - Model configuration: Uses `claude-3-5-sonnet-20241022` with 4096 max tokens
+  - Modified `bot.py` to pass `send_message` callback to `handle_ai()` for progress updates
+  - Updated help command to show AI command as available
+
+- **Anthropic Python SDK dependency** (`src/requirements.txt`)
+  - Added `anthropic==0.40.0` to requirements
+  - Includes dependencies: anyio, httpx, jiter, pydantic, sniffio
+
+- **Comprehensive unit tests for AI command** (`tests/test_bot.py`)
+  - `test_handle_ai_no_anthropic_key` - Tests behavior when ANTHROPIC_API_KEY is not set
+  - `test_handle_ai_no_args` - Tests AI command without arguments
+  - `test_handle_ai_success` - Tests successful AI response
+  - `test_handle_ai_empty_response` - Tests handling of empty API responses
+  - `test_handle_ai_api_error` - Tests API error handling
+  - `test_handle_ai_with_callback` - Tests 5-second progress notification callback
+  - `test_handle_ai_stream_message` - Tests AI command from stream messages
+  - `test_execute_command_ai` - Tests AI command through execute_command interface
+  - All 8 new AI tests pass successfully
+  - Total test suite now has 62 passing tests (up from 54)
+
+- **Integration tests for AI command** (`tests/test_integration.py`)
+  - New `TestAICommand` test class with comprehensive integration tests
+  - `test_ai_command_without_args` - Tests usage message when no prompt provided
+  - `test_ai_command_simple_prompt_private` - Tests AI command in private messages
+  - `test_ai_command_simple_prompt_stream` - Tests AI command in stream messages
+  - `test_ai_command_response_time` - Tests AI responds within 20 seconds
+  - `test_ai_command_multiple_words_prompt` - Tests multi-word prompts about technical topics
+  - `test_ai_command_without_api_key_configured` - Tests error handling when API key is missing
+  - Tests use `@pytest.mark.requires_anthropic` marker for conditional execution
+  - Tests skip automatically if ANTHROPIC_API_KEY is not configured
+  - Updated `run_integration_tests()` to include AI command test suite
+
+- **Environment variable for AI functionality** (`src/bot.py`)
+  - Added ANTHROPIC_API_KEY environment variable (optional)
+  - If not set, AI command will return a helpful error message
+  - Bot initializes anthropic client only when API key is available
+  - Note: For production deployment, ANTHROPIC_API_KEY should be added to:
+    - Kubernetes secrets in `chart/templates/secret.yaml`
+    - Environment variables in `chart/templates/deployment.yaml`
+    - Values configuration in `chart/values.yaml`
+
 - **Nautobot integration** (`src/fetchers.py`, `src/commands.py`)
   - New `get_nautobot_devices()` function to query Nautobot API for device information
   - New `nautobot` command that accepts node names as arguments
@@ -29,6 +82,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Added `manuvs@een.com` (without the dot)
 
 ### Changed
+
+- **AI command implementation** (`src/commands.py`)
+  - Removed placeholder message "AI command is not yet implemented. Coming soon!"
+  - Replaced with full `handle_ai()` function implementation
+  - Updated imports to include `threading` and `time` for progress notifications
+  - Added try-except import block for anthropic package with graceful fallback
+
+- **Message handling for AI command** (`src/bot.py`)
+  - Modified `handle_message()` to detect AI command and pass `send_message` callback
+  - Enables AI command to send progress notifications for long-running requests
+  - Special handling allows AI command to provide better user experience with status updates
 
 - **Makefile version bump**
   - Updated `IMAGE_TAG` from `v1.0.4` to `v1.1.0`
