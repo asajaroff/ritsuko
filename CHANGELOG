@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - Proper error messages for missing API key, empty responses, and API errors
   - Uses threading.Timer for non-blocking 5-second progress updates
   - Logs request completion time for performance monitoring
-  - Model configuration: Uses `claude-3-5-sonnet-20241022` with 4096 max tokens
+  - Model configuration: Uses `claude-sonnet-4-5-20250929` with 4096 max tokens
   - Modified `bot.py` to pass `send_message` callback to `handle_ai()` for progress updates
   - Updated help command to show AI command as available
 
