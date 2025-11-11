@@ -8,6 +8,7 @@ import time
 from nodes import handle_node
 
 from fetchers import get_nautobot_devices
+from ai_context import get_system_prompt
 
 # Import anthropic for AI functionality
 try:
@@ -138,17 +139,32 @@ def handle_ai(message, args, send_message_callback=None):
         # Initialize Anthropic client
         client = anthropic.Anthropic(api_key=api_key)
 
-        # Call Claude API
-        response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
+        # Get system prompt from context
+        system_prompt = get_system_prompt()
+
+        # Build messages list
+        messages = [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+
+        # Call Claude API with system prompt
+        api_params = {
+            "model": "claude-sonnet-4-5-20250929",
+            "max_tokens": 4096,
+            "messages": messages
+        }
+
+        # Add system prompt if available
+        if system_prompt:
+            api_params["system"] = system_prompt
+            logging.debug("Using AI context system prompt")
+        else:
+            logging.warning("No AI context system prompt found, proceeding without it")
+
+        response = client.messages.create(**api_params)
 
         # Cancel the timer if it hasn't fired yet
         if timer:

@@ -15,6 +15,7 @@ zipp==3.23.0
 zulip==0.9.1
 zulip_bots==0.9.1
 anthropic==0.40.0
+PyYAML==6.0.2
 
 # Testing dependencies
 pytest==8.3.4
