@@ -44,6 +44,10 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: 8080
+              protocol: TCP
           env:
             - name: LOG_LEVEL
               value: {{ .Values.env.logLevel | quote }}
@@ -70,6 +74,21 @@ spec:
                 secretKeyRef:
                   name: {{ include "ritsuko-bot.fullname" . }}
                   key: anthropic-api-key
+            - name: GITHUB_MATCHBOX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: github-matchbox-token
+            - name: NAUTOBOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: nautobot-token
+            - name: NAUTOBOT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: nautobot-url
             {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:

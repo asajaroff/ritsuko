@@ -2,6 +2,8 @@ import os
 import logging
 import zulip
 import sys
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from commands import execute_command
 
 # Set up logging
@@ -12,6 +14,9 @@ logging.basicConfig(
 )
 
 RITSUKO_VERSION = 'local-dev'
+
+# Cache bot profile to avoid repeated API calls
+BOT_PROFILE = None
 
 #Set up tools
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', None)
@@ -35,8 +40,50 @@ except Exception as e:
 
 authorized_users = [
     'asajaroff@een.com',
+    'miniguez@een.com',
+    'user1088@chat.eencloud.com',
+    'jchio@een.com',
+    'mgolden@een.com',
+    'pwhiteside@een.com',
+    'mdiemel@een.com',
+    'manuvs@een.com',
+    'manu.vs@een.com',
     'cjewell@een.com'
     ] # TODO: move authorized_users to environment variables
+
+# Health check server
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Simple HTTP handler for health checks."""
+
+    def do_GET(self):
+        """Handle GET requests for health checks."""
+        if self.path in ['/healthz', '/readyz']:
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'OK')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        """Suppress default logging to avoid cluttering logs."""
+        pass
+
+def start_health_server(port=8080):
+    """Start HTTP server for health checks in a separate thread."""
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    logging.info(f'Starting health check server on port {port}')
+
+    def serve():
+        try:
+            server.serve_forever()
+        except Exception as e:
+            logging.error(f'Health check server error: {e}')
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    return server
 
 def send_message(message_dict):
     """Send a message with error handling."""
@@ -51,59 +98,117 @@ def send_message(message_dict):
         return False
 
 def handle_message(message):
-    """Handle incoming Zulip messages with error handling."""
+    """
+    Handle incoming Zulip messages with the following behavior:
+    - Always reply when tagged with @
+    - In public/private streams: never reply if not tagged
+    - In private conversations with 3+ users (including bot): don't reply unless tagged
+    - In 1-on-1 conversations: always reply, even without tag
+    """
     try:
         # Ignore messages from the bot itself
         if message['sender_email'] == os.environ['ZULIP_EMAIL']:
-            logging.debug('Ignoring own message')
             return
 
-        if message['sender_email'] in authorized_users:
-            logging.info(f'{message['sender_email']}: {message['content']}' )
+        # Get message metadata
+        bot_user_id = BOT_PROFILE['user_id']
+        mentioned_user_ids = message.get('mentioned_user_ids', [])
+        msg_type = message.get('type', 'unknown')
+        content = message.get('content', '')
 
-            # Execute command and get response
+        logging.debug(f'Message type: {msg_type}, Bot ID: {bot_user_id}, Mentioned IDs: {mentioned_user_ids}')
+        logging.debug(f'Message content: {content}')
+
+        # Check if bot is mentioned
+        bot_mentioned = (bot_user_id in mentioned_user_ids or
+                        '@**Ritsuko**' in content or
+                        '@_**Ritsuko**' in content)
+
+        # Determine if we should respond based on message type and context
+        should_respond = False
+
+        if msg_type == 'stream':
+            # Public streams: only respond if bot is mentioned
+            if bot_mentioned:
+                should_respond = True
+                logging.debug('Responding to stream message with mention')
+            else:
+                logging.debug('Ignoring stream message without mention')
+                return
+
+        elif msg_type == 'private':
+            display_recipient = message.get('display_recipient', [])
+
+            # Count non-bot users in the conversation
+            non_bot_users = [r for r in display_recipient if r['email'] != os.environ['ZULIP_EMAIL']]
+            num_non_bot_users = len(non_bot_users)
+
+            logging.debug(f'Private message with {num_non_bot_users} non-bot user(s)')
+
+            if num_non_bot_users == 1:
+                # 1-on-1 conversation: always respond
+                should_respond = True
+                logging.debug('Responding to 1-on-1 private message')
+            else:
+                # Group private conversation: only respond if mentioned
+                if bot_mentioned:
+                    should_respond = True
+                    logging.debug('Responding to group private message with mention')
+                else:
+                    logging.debug('Ignoring group private message without mention')
+                    return
+        else:
+            logging.debug(f'Unknown message type: {msg_type}')
+            return
+
+        # If we shouldn't respond, exit early
+        if not should_respond:
+            return
+
+        # Log the message
+        logging.info(f'{message["sender_email"]}: {message["content"]}')
+
+        # Check authorization
+        if message['sender_email'] not in authorized_users:
+            logging.warning(f'Unauthorized user: {message["sender_email"]}')
+            response = 'I am not authorized to talk to you'
+        else:
             response = execute_command(message)
 
-            if message['type'] == 'private':
-                send_message(dict(
-                    type='private',
-                    to=[r['email'] for r in message['display_recipient']],
-                    content=response
-                ))
+        # Send response
+        if message['type'] == 'private':
+            send_message({
+                'type': 'private',
+                'to': [r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
+                'content': response
+            })
+        elif message['type'] == 'stream':
+            send_message({
+                'type': 'stream',
+                'to': message['display_recipient'],
+                'subject': message['subject'],
+                'content': response
+            })
 
-            elif message['type'] == 'stream':
-                send_message(dict(
-                    type='stream',
-                    to=message['display_recipient'],
-                    subject=message['subject'],
-                    content=response
-                ))
-
-        else:
-            logging.warning(f'Ignoring message from {message['sender_email']} -- msg: {message['content']}' )
-            if message['type'] == 'private':
-                send_message(dict(
-                    type='private',
-                    to=[r['email'] for r in message['display_recipient']],
-                    content='I am not authorized to talk to you'
-                ))
-
-            elif message['type'] == 'stream':
-                send_message(dict(
-                    type='stream',
-                    to=message['display_recipient'],
-                    subject=message['subject'],
-                    content='I am not authorized to talk to you'
-                ))
-
-    except KeyError as e:
-        logging.error(f'Missing expected field in message: {e}')
     except Exception as e:
-        logging.error(f'Unexpected error handling message: {e}')
+        logging.error(f'Error handling message: {e}')
 
 
 def main():
     """Main function to run the bot."""
+    global BOT_PROFILE
+
+    # Start health check server
+    start_health_server(port=8080)
+
+    # Get bot profile once at startup
+    try:
+        BOT_PROFILE = client.get_profile()
+        logging.info(f'Bot profile loaded: {BOT_PROFILE.get("full_name")} (ID: {BOT_PROFILE.get("user_id")})')
+    except Exception as e:
+        logging.error(f'Failed to get bot profile: {e}')
+        sys.exit(1)
+
     # Subscribe to messages
     logging.info('Starting Zulip bot...')
     try:

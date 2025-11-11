@@ -1,3 +1,6 @@
 .venv/**
 .env
 **__pycache__**
+chart/values-override.yaml
+**.env.test
+run.sh
