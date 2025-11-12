@@ -35,14 +35,14 @@ client = None
 authorized_users = [
     'asajaroff@een.com',
     'miniguez@een.com',
-    'user1088@chat.eencloud.com',
+    'user1088@chat.eencloud.com', # Manu
     'jchio@een.com',
-    'mgolden@een.com',
     'pwhiteside@een.com',
     'mdiemel@een.com',
-    'manuvs@een.com',
-    'manu.vs@een.com',
-    'cjewell@een.com'
+    'cjewell@een.com',
+    'yolorunsola@een.com',
+    'abrown@een.com',
+    'gkameni@een.com',
     ] # TODO: move authorized_users to environment variables
 
 # Health check server
