@@ -160,6 +160,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Updated all existing node command tests to properly mock HTTP response status codes
   - All 67 unit tests now pass successfully (up from 62)
 
+- **Nautobot command error handling** (`src/fetchers.py`, `tests/test_bot.py`)
+  - Added comprehensive error handling for nautobot device lookup failures (matching node command pattern)
+  - **HTTP 404 errors**: Device not found in Nautobot
+    - Clear error message indicating device doesn't exist
+    - Helpful suggestion to verify device name
+  - **HTTP 403 errors**: Access forbidden when querying Nautobot
+    - Error message about potential Nautobot token issues
+  - **Other HTTP errors**: Server errors (500, etc.)
+    - Generic error message with specific HTTP status code
+  - **JSON decode errors**: Corrupted or invalid response data
+    - Error message indicating parse failure with context
+  - **Network errors (OSError)**: Connection failures
+    - User-friendly error message with network error details
+  - **Attribute errors**: Failed to process response data
+    - Error message indicating data processing failure
+  - **Unexpected exceptions**: Other failures
+    - Catches all exceptions with detailed error messages
+  - **Rack query error handling**: Added error handling for secondary rack data requests
+    - Gracefully handles HTTP errors when fetching rack details
+    - Returns rack ID with status note on failure instead of crashing
+    - Handles JSON decode errors and unexpected exceptions
+  - All error messages formatted with markdown for better readability in Zulip
+  - Updated existing error handlers to return user-friendly error messages instead of empty lists
+  - Added 4 new comprehensive test cases for HTTP error scenarios:
+    - `test_get_nautobot_devices_not_found_404`
+    - `test_get_nautobot_devices_access_forbidden_403`
+    - `test_get_nautobot_devices_http_error_500`
+    - `test_get_nautobot_devices_unexpected_exception`
+  - Updated 3 existing test cases to verify error messages instead of empty lists:
+    - `test_get_nautobot_devices_network_error`
+    - `test_get_nautobot_devices_json_decode_error`
+  - Updated all existing successful nautobot test cases to properly mock HTTP response status codes (200)
+  - All 71 unit tests now pass successfully (up from 67)
+
 - **Integration test timeout handling** (`tests/test_integration.py`)
   - Fixed `send_and_wait()` method to accept optional `timeout` parameter
   - Resolves 4 failing AI command integration tests that required longer timeouts (15-20 seconds)

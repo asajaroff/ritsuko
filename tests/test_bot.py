@@ -779,6 +779,7 @@ class TestNautobotFetcher(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(response_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -803,6 +804,7 @@ class TestNautobotFetcher(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(response_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -831,6 +833,7 @@ class TestNautobotFetcher(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(response_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -864,6 +867,7 @@ class TestNautobotFetcher(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(response_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -881,7 +885,10 @@ class TestNautobotFetcher(unittest.TestCase):
 
         result = get_nautobot_devices('test-node')
 
-        self.assertEqual(result, [])
+        self.assertEqual(len(result), 1)
+        self.assertIn('Error', result[0])
+        self.assertIn('Network error', result[0])
+        self.assertIn('Connection failed', result[0])
 
     @patch('fetchers.urllib3.PoolManager')
     def test_get_nautobot_devices_json_decode_error(self, mock_pool_manager):
@@ -890,12 +897,16 @@ class TestNautobotFetcher(unittest.TestCase):
         mock_pool_manager.return_value = mock_http
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = b'Invalid JSON'
         mock_http.request.return_value = mock_response
 
         result = get_nautobot_devices('test-node')
 
-        self.assertEqual(result, [])
+        self.assertEqual(len(result), 1)
+        self.assertIn('Error', result[0])
+        self.assertIn('Failed to parse', result[0])
+        self.assertIn('test-node', result[0])
 
     @patch('fetchers.urllib3.PoolManager')
     def test_get_nautobot_devices_missing_custom_fields(self, mock_pool_manager):
@@ -919,6 +930,7 @@ class TestNautobotFetcher(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(response_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -926,6 +938,75 @@ class TestNautobotFetcher(unittest.TestCase):
 
         self.assertEqual(len(result), 1)
         self.assertIn('N/A', result[0])  # Should show N/A for missing custom_fields
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_not_found_404(self, mock_pool_manager):
+        """Test get_nautobot_devices when device doesn't exist (404 error)."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        mock_response = MagicMock()
+        mock_response.status = 404
+        mock_response.data = b'{"message": "Not Found"}'
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('nonexistent-device')
+
+        self.assertEqual(len(result), 1)
+        self.assertIn('Error', result[0])
+        self.assertIn('not found', result[0])
+        self.assertIn('nonexistent-device', result[0])
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_access_forbidden_403(self, mock_pool_manager):
+        """Test get_nautobot_devices when access is forbidden (403 error)."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        mock_response = MagicMock()
+        mock_response.status = 403
+        mock_response.data = b'{"message": "Forbidden"}'
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('restricted-device')
+
+        self.assertEqual(len(result), 1)
+        self.assertIn('Error', result[0])
+        self.assertIn('forbidden', result[0])
+        self.assertIn('restricted-device', result[0])
+        self.assertIn('token', result[0])
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_http_error_500(self, mock_pool_manager):
+        """Test get_nautobot_devices with server error (500)."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+
+        mock_response = MagicMock()
+        mock_response.status = 500
+        mock_response.data = b'{"message": "Internal Server Error"}'
+        mock_http.request.return_value = mock_response
+
+        result = get_nautobot_devices('test-device')
+
+        self.assertEqual(len(result), 1)
+        self.assertIn('Error', result[0])
+        self.assertIn('Failed to retrieve', result[0])
+        self.assertIn('500', result[0])
+
+    @patch('fetchers.urllib3.PoolManager')
+    def test_get_nautobot_devices_unexpected_exception(self, mock_pool_manager):
+        """Test get_nautobot_devices with unexpected exception."""
+        mock_http = MagicMock()
+        mock_pool_manager.return_value = mock_http
+        mock_http.request.side_effect = Exception('Unexpected error')
+
+        result = get_nautobot_devices('test-device')
+
+        self.assertEqual(len(result), 1)
+        self.assertIn('Error', result[0])
+        self.assertIn('unexpected error', result[0])
+        self.assertIn('Unexpected error', result[0])
 
 
 class TestNautobotCommand(unittest.TestCase):

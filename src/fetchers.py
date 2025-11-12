@@ -21,6 +21,17 @@ def get_nautobot_devices(node):
           headers=nautobot_headers,
           redirect=True)
 
+    # Check for HTTP errors (404, 403, etc.)
+    if query_results.status == 404:
+      print(f"Device '{node}' not found in Nautobot")
+      return [f"**Error**: Device `{node}` not found in Nautobot.\n\nPlease verify the device name is correct."]
+    elif query_results.status == 403:
+      print(f"Access forbidden to Nautobot for device '{node}'")
+      return [f"**Error**: Access forbidden when querying device `{node}`. The Nautobot token may be invalid or lack necessary permissions."]
+    elif query_results.status >= 400:
+      print(f"HTTP error {query_results.status} when querying device '{node}'")
+      return [f"**Error**: Failed to retrieve device `{node}` from Nautobot (HTTP {query_results.status})."]
+
     print(query_results.data)
 
     data = json.loads(query_results.data.decode('utf-8'))
@@ -37,19 +48,31 @@ def get_nautobot_devices(node):
           device['url'] = device['url'].replace("/api/", "/", 1)
           rack_id = device['rack'].get('id', 'N/A')
 
-          rack_query = http.request(
-                "GET",
-                f"{nautobot_url}/dcim/racks/{rack_id}",
-                headers=nautobot_headers,
-                redirect=True)
+          try:
+            rack_query = http.request(
+                  "GET",
+                  f"{nautobot_url}/dcim/racks/{rack_id}",
+                  headers=nautobot_headers,
+                  redirect=True)
 
-          # https://nautobot.eencloud.com/api/dcim/racks/a283344f-a59c-466d-8fb5-cd1055aeac80/
-          data_rack = json.loads(rack_query.data.decode('utf-8'))
+            # Check for HTTP errors on rack query
+            if rack_query.status >= 400:
+              print(f"Failed to retrieve rack {rack_id} (HTTP {rack_query.status})")
+              rack_info = f"Rack:\t{rack_id} (details unavailable)"
+            else:
+              # https://nautobot.eencloud.com/api/dcim/racks/a283344f-a59c-466d-8fb5-cd1055aeac80/
+              data_rack = json.loads(rack_query.data.decode('utf-8'))
 
-          # rack_display = device['rack'].get('name', 'N/A')
-          rack_url = device['rack'].get('url', '').replace("/api/", "/", 1)
-          rack_name = data_rack.get('name', str(rack_id))
-          rack_info = f"Rack:\t[{rack_name}]({rack_url})" if rack_url else str(rack_id)
+              # rack_display = device['rack'].get('name', 'N/A')
+              rack_url = device['rack'].get('url', '').replace("/api/", "/", 1)
+              rack_name = data_rack.get('name', str(rack_id))
+              rack_info = f"Rack:\t[{rack_name}]({rack_url})" if rack_url else str(rack_id)
+          except json.JSONDecodeError as e:
+            print(f"Failed to parse rack data for {rack_id}: {e}")
+            rack_info = f"Rack:\t{rack_id} (parse error)"
+          except Exception as e:
+            print(f"Unexpected error querying rack {rack_id}: {e}")
+            rack_info = f"Rack:\t{rack_id} (query failed)"
 
         k8s_version = "N/A"
         if device.get('custom_fields') and device['custom_fields'] is not None:
@@ -65,13 +88,13 @@ Kubernetes version: {k8s_version}
 
   except OSError as err:
     print(f"OSError: {err}")
-    return []
+    return [f"**Error**: Network error when connecting to Nautobot: {str(err)}"]
   except AttributeError as err:
     print(f"AttributeError: {err}")
-    return []
+    return [f"**Error**: Failed to process Nautobot response data: {str(err)}"]
   except json.JSONDecodeError as err:
     print(f"JSON decode error: {err}")
-    return []
+    return [f"**Error**: Failed to parse Nautobot data for device `{node}`. The data may be corrupted or in an unexpected format."]
   except Exception as err:
     print(f"Unexpected error: {err}")
-    return []
+    return [f"**Error**: An unexpected error occurred while retrieving device `{node}`: {str(err)}"]
