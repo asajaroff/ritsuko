@@ -65,14 +65,15 @@ def handle_help(message, args):
     help_text = """markdown
 **Available Commands:**
 - `ai <prompt>` - Interact with an LLM
-- `mcp <prompt>` - Interact with an LLM and MCP servers **TODO**
+- ~~`mcp <prompt>` - Interact with an LLM and MCP servers~~ **TODO**
+- `nautobot <node>` - Get the nautobot info for the given node
 - `status` - Get bot status information
 - `clusters` | `clusters <cluster>` - Lists the cluster name and kubernetes cluster name - If a cluster is selected will bring data from that
 - `node <node_name>` - Get information about a node
-- `jira <prompt>` - Interact with Jira #TODO
-- `confluence <prompt>` - Interact with Confluence **TODO**
+- ~~`jira <prompt>` - Interact with Jira~~ #TODO
+- ~~`confluence <prompt>` - Interact with Confluence~~ **TODO**
 - `help` - Show this help message
-- `version` - Show bot version and debug info
+- `version` - Show bot version and debug information
 
 Usage:
 ```markdown
