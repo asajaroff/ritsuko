@@ -137,6 +137,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Node command error handling** (`src/nodes.py`, `tests/test_bot.py`)
+  - Added comprehensive error handling for node lookup failures
+  - **HTTP 404 errors**: Node not found in matchbox repository
+    - Clear error message indicating node doesn't exist
+    - Helpful suggestion to verify node name and try `nautobot` command
+  - **HTTP 403 errors**: Access forbidden when querying matchbox
+    - Error message about potential GitHub token issues
+  - **Other HTTP errors**: Server errors (500, etc.)
+    - Generic error message with specific HTTP status code
+  - **JSON decode errors**: Corrupted or invalid response data
+    - Error message indicating parse failure with context
+  - **Unexpected exceptions**: Network errors and other failures
+    - Catches all exceptions with detailed error messages
+  - All error messages formatted with markdown for better readability in Zulip
+  - Added 5 comprehensive test cases for error scenarios:
+    - `test_handle_node_not_found_404`
+    - `test_handle_node_access_forbidden_403`
+    - `test_handle_node_http_error_500`
+    - `test_handle_node_json_decode_error`
+    - `test_handle_node_unexpected_exception`
+  - Updated all existing node command tests to properly mock HTTP response status codes
+  - All 67 unit tests now pass successfully (up from 62)
+
 - **Integration test timeout handling** (`tests/test_integration.py`)
   - Fixed `send_and_wait()` method to accept optional `timeout` parameter
   - Resolves 4 failing AI command integration tests that required longer timeouts (15-20 seconds)

@@ -32,15 +32,34 @@ def handle_node(message, nodes):
   for node in nodes:
     node = node
     url = f"https://api.github.com/repos/{owner}/{repo}/contents//groups/{node}.json"
-    response = http.request(
-      "GET",
-      url,
-      headers=headers,
-      redirect=True)
 
-    json_string = response.data.decode('utf-8')
-    matchbox_data = json.loads(json_string)
-    context = matchbox_data.get('metadata', {}).get('pod', None)
+    try:
+      response = http.request(
+        "GET",
+        url,
+        headers=headers,
+        redirect=True)
+
+      # Check for HTTP errors (404, 403, etc.)
+      if response.status == 404:
+        logging.error(f"Node '{node}' not found in matchbox repository")
+        return f"**Error**: Node `{node}` not found in matchbox repository.\n\nPlease verify the node name is correct. You can also try the `nautobot {node}` command to search for the node in Nautobot."
+      elif response.status == 403:
+        logging.error(f"Access forbidden to matchbox repository for node '{node}'")
+        return f"**Error**: Access forbidden when querying node `{node}`. The GitHub token may be invalid or lack necessary permissions."
+      elif response.status >= 400:
+        logging.error(f"HTTP error {response.status} when querying node '{node}'")
+        return f"**Error**: Failed to retrieve node `{node}` from matchbox repository (HTTP {response.status})."
+
+      json_string = response.data.decode('utf-8')
+      matchbox_data = json.loads(json_string)
+      context = matchbox_data.get('metadata', {}).get('pod', None)
+    except json.JSONDecodeError as e:
+      logging.error(f"Failed to parse matchbox data for node '{node}': {e}")
+      return f"**Error**: Failed to parse matchbox data for node `{node}`. The data may be corrupted or in an unexpected format."
+    except Exception as e:
+      logging.error(f"Unexpected error when querying node '{node}': {e}")
+      return f"**Error**: An unexpected error occurred while retrieving node `{node}`: {str(e)}"
 
     reply = []
 

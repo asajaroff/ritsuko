@@ -447,6 +447,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -478,6 +479,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -519,6 +521,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -545,6 +548,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -571,6 +575,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -603,6 +608,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -630,6 +636,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -656,6 +663,7 @@ class TestNodeCommand(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -1008,6 +1016,7 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -1033,6 +1042,7 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -1058,6 +1068,7 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -1082,6 +1093,7 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -1107,6 +1119,7 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         }
 
         mock_response = MagicMock()
+        mock_response.status = 200
         mock_response.data = json.dumps(matchbox_data).encode('utf-8')
         mock_http.request.return_value = mock_response
 
@@ -1128,6 +1141,80 @@ class TestNodeCommandEnhanced(unittest.TestCase):
 
         self.assertIn('Usage', result)
         self.assertIn('node <node>', result)
+
+    @patch('nodes.http')
+    def test_handle_node_not_found_404(self, mock_http):
+        """Test handle_node when node doesn't exist (404 error)."""
+        mock_response = MagicMock()
+        mock_response.status = 404
+        mock_response.data = b'{"message": "Not Found"}'
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['nonexistent-node'])
+
+        self.assertIn('Error', result)
+        self.assertIn('not found', result)
+        self.assertIn('nonexistent-node', result)
+        self.assertIn('nautobot', result)
+
+    @patch('nodes.http')
+    def test_handle_node_access_forbidden_403(self, mock_http):
+        """Test handle_node when access is forbidden (403 error)."""
+        mock_response = MagicMock()
+        mock_response.status = 403
+        mock_response.data = b'{"message": "Forbidden"}'
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['restricted-node'])
+
+        self.assertIn('Error', result)
+        self.assertIn('forbidden', result)
+        self.assertIn('restricted-node', result)
+        self.assertIn('token', result)
+
+    @patch('nodes.http')
+    def test_handle_node_http_error_500(self, mock_http):
+        """Test handle_node with server error (500)."""
+        mock_response = MagicMock()
+        mock_response.status = 500
+        mock_response.data = b'{"message": "Internal Server Error"}'
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['test-node'])
+
+        self.assertIn('Error', result)
+        self.assertIn('Failed to retrieve', result)
+        self.assertIn('500', result)
+
+    @patch('nodes.http')
+    def test_handle_node_json_decode_error(self, mock_http):
+        """Test handle_node with invalid JSON response."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.data = b'Invalid JSON content'
+        mock_http.request.return_value = mock_response
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['test-node'])
+
+        self.assertIn('Error', result)
+        self.assertIn('Failed to parse', result)
+        self.assertIn('test-node', result)
+
+    @patch('nodes.http')
+    def test_handle_node_unexpected_exception(self, mock_http):
+        """Test handle_node with unexpected exception."""
+        mock_http.request.side_effect = Exception('Network error')
+
+        message = {'type': 'private'}
+        result = handle_node(message, ['test-node'])
+
+        self.assertIn('Error', result)
+        self.assertIn('unexpected error', result)
+        self.assertIn('Network error', result)
 
 
 class TestAICommand(unittest.TestCase):
