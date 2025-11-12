@@ -1,6 +1,6 @@
 IMAGE_NAME=harbor.eencloud.com/test/ritsuko
 UNIQ=$(shell git rev-parse --short HEAD)
-IMAGE_TAG=v1.4.0
+IMAGE_TAG=v1.4.1
 IMAGE_TAG_UNIQ= $(IMAGE_TAG)-$(UNIQ)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)

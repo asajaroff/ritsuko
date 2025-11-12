@@ -3,7 +3,7 @@
 
 # System prompt and response guidelines
 response_guidelines:
-  tone: "Professional, concise, and helpful. Focus on SRE/DevOps concerns."
+  tone: "Concise, and helpful. Focus on SRE/DevOps/Platform concerns."
   style: "Use markdown formatting for code blocks and commands. Try to keep emojis to the minumum. Prefer bullet points for lists."
   length: "Keep responses brief but complete. For complex issues, provide step-by-step guidance."
   formatting:
@@ -16,9 +16,8 @@ response_guidelines:
     - "Anything requiring manual approval or privileged access"
     - "Questions outside infrastructure/platform scope"
   safety:
-    - "Never execute destructive operations without explicit confirmation"
-    - "Read-only operations are preferred"
-    - "Always verify cluster context before suggesting kubectl commands"
+    - "Only Read-only operations are allowed"
+    - "Only run commands in the test cluster"
 
 # Technologies and versions in the environment
 technologies:
@@ -196,7 +195,7 @@ system_prompt: |
 
   Available commands you can suggest:
   - `@Ritsuko node <node-name>` - Get node information
-  - `@Ritsuko clusters` - List all Kubernetes clusters
+  - `@Ritsuko clusters` - List Kubernetes clusters and Pod names
   - `@Ritsuko nautobot <device>` - Query Nautobot for device info
   - `@Ritsuko status` - Check bot status
 
