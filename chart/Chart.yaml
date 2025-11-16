@@ -3,4 +3,4 @@ name: ritsuko-bot
 description: A Helm chart for deploying Ritsuko in a Kubernetes cluster
 type: application
 version: 0.2.0
-appVersion: v1.4.2-c747526
+appVersion: v1.5.0-78f9a62

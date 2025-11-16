@@ -12,7 +12,8 @@ from commands import execute_command
 logging.basicConfig(
     level=os.environ.get('LOG_LEVEL', 'INFO').upper(),
     format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    stream=sys.stdout
 )
 
 RITSUKO_VERSION = 'local-dev'
