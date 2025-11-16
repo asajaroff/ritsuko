@@ -4,6 +4,7 @@ import zulip
 import sys
 import threading
 import time
+import re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from commands import execute_command
 
@@ -22,12 +23,78 @@ BOT_PROFILE = None
 #Set up tools
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', None)
 
-# Validate required environment variables
-required_env_vars = ['ZULIP_EMAIL', 'ZULIP_API_KEY', 'ZULIP_SITE']
-missing_vars = [var for var in required_env_vars if not os.environ.get(var)]
-if missing_vars:
-    logging.error(f'Missing required environment variables: {", ".join(missing_vars)}')
-    sys.exit(1)
+def validate_environment():
+    """Validate all environment variables at startup with format checking."""
+    errors = []
+    warnings = []
+
+    # Required variables with validation patterns
+    required = {
+        'ZULIP_EMAIL': (r'^[\w\.-]+@[\w\.-]+\.\w+$', 'valid email address'),
+        'ZULIP_API_KEY': (r'^.{20,}$', 'at least 20 characters'),
+        'ZULIP_SITE': (r'^https?://.+', 'valid URL starting with http:// or https://'),
+    }
+
+    # Optional variables (enable features)
+    optional = {
+        'ANTHROPIC_API_KEY': (r'^sk-ant-.+', 'Anthropic API key format (sk-ant-...)'),
+        'GITHUB_MATCHBOX_TOKEN': (r'^(ghp_|github_pat_).+', 'GitHub token format'),
+        'NAUTOBOT_TOKEN': (r'^.{10,}$', 'at least 10 characters'),
+        'NAUTOBOT_URL': (r'^https?://.+', 'valid URL'),
+    }
+
+    # Validate required variables
+    for var, (pattern, description) in required.items():
+        value = os.environ.get(var)
+        if not value:
+            errors.append(f"Missing required variable: {var}")
+        elif not re.match(pattern, value):
+            errors.append(f"Invalid format for {var}: expected {description}")
+
+    # Validate optional variables (warn only)
+    features_available = []
+    features_unavailable = []
+
+    for var, (pattern, description) in optional.items():
+        value = os.environ.get(var)
+        if not value:
+            features_unavailable.append(var)
+        elif not re.match(pattern, value):
+            warnings.append(f"Invalid format for {var}: expected {description}")
+            features_unavailable.append(var)
+        else:
+            features_available.append(var)
+
+    # Report errors and exit if critical issues found
+    if errors:
+        logging.error("Configuration validation failed:")
+        for err in errors:
+            logging.error(f"  - {err}")
+        sys.exit(1)
+
+    # Report warnings
+    if warnings:
+        for warn in warnings:
+            logging.warning(f"  - {warn}")
+
+    # Log feature availability
+    feature_map = {
+        'ANTHROPIC_API_KEY': 'AI commands',
+        'GITHUB_MATCHBOX_TOKEN': 'Node queries',
+        'NAUTOBOT_TOKEN': 'Nautobot queries',
+        'NAUTOBOT_URL': 'Nautobot API access'
+    }
+
+    logging.info("Configuration validation passed")
+    if features_available:
+        enabled_features = [feature_map.get(f, f) for f in features_available]
+        logging.info(f"Available features: {', '.join(enabled_features)}")
+    if features_unavailable:
+        disabled_features = [feature_map.get(f, f) for f in features_unavailable]
+        logging.warning(f"Unavailable features (missing/invalid config): {', '.join(disabled_features)}")
+
+# Validate environment on module load
+validate_environment()
 
 # Initialize client as None - will be set in main() with retry logic
 client = None
@@ -196,14 +263,15 @@ def handle_message(message):
         logging.error(f'Error handling message: {e}')
 
 
-def main():
-    """Main function to run the bot."""
-    global BOT_PROFILE, client
+def initialize_zulip_client():
+    """Initialize Zulip client with retry logic.
 
-    # Start health check server first so K8s doesn't kill us during initialization
-    start_health_server(port=8080)
+    Returns:
+        zulip.Client: Connected Zulip client
 
-    # Initialize Zulip client with retry logic
+    Raises:
+        Exception: If unable to connect after max retries
+    """
     max_retries = 5
     retry_delay = 10  # seconds
 
@@ -216,28 +284,93 @@ def main():
                 site=os.environ['ZULIP_SITE']
             )
             # Test connection by getting profile
-            BOT_PROFILE = client.get_profile()
-            logging.info(f'Successfully connected! Bot profile: {BOT_PROFILE.get("full_name")} (ID: {BOT_PROFILE.get("user_id")})')
-            break
+            profile = client.get_profile()
+            if profile.get('result') != 'success':
+                raise Exception(f"Failed to get profile: {profile.get('msg', 'Unknown error')}")
+
+            logging.info(f'Successfully connected! Bot profile: {profile.get("full_name")} (ID: {profile.get("user_id")})')
+            return client, profile
         except Exception as e:
             logging.error(f'Failed to initialize Zulip client (attempt {attempt}/{max_retries}): {e}')
             if attempt < max_retries:
                 logging.info(f'Retrying in {retry_delay} seconds...')
                 time.sleep(retry_delay)
             else:
-                logging.error('Max retries reached. Exiting.')
+                logging.critical('Max retries reached. Unable to connect to Zulip.')
+                raise
+
+
+def main():
+    """Main function to run the bot with resilient error handling."""
+    global BOT_PROFILE, client
+
+    # Start health check server first so K8s doesn't kill us during initialization
+    start_health_server(port=8080)
+
+    # Initialize Zulip client with retry logic
+    try:
+        client, BOT_PROFILE = initialize_zulip_client()
+    except Exception as e:
+        logging.critical(f'Failed to initialize bot: {e}')
+        sys.exit(1)
+
+    # Message loop with resilient error handling
+    failure_count = 0
+    max_consecutive_failures = 3
+
+    logging.info('Starting resilient message processing loop...')
+
+    while True:
+        try:
+            # Reset failure counter on successful start
+            failure_count = 0
+            logging.info('Message loop active, waiting for messages...')
+
+            # This blocks until an error occurs
+            client.call_on_each_message(handle_message)
+
+        except KeyboardInterrupt:
+            logging.info('Graceful shutdown requested by user')
+            sys.exit(0)
+
+        except ConnectionError as e:
+            failure_count += 1
+            logging.error(f'Connection error in message loop (failure {failure_count}/{max_consecutive_failures}): {e}')
+
+            if failure_count >= max_consecutive_failures:
+                logging.critical('Max consecutive connection failures reached. Exiting for pod restart.')
                 sys.exit(1)
 
-    # Subscribe to messages
-    logging.info('Starting Zulip bot message loop...')
-    try:
-        client.call_on_each_message(handle_message)
-    except KeyboardInterrupt:
-        logging.info('Bot stopped by user')
-        sys.exit(0)
-    except Exception as e:
-        logging.error(f'Fatal error in message loop: {e}')
-        sys.exit(1)
+            # Exponential backoff: 5s, 10s, 20s, capped at 60s
+            backoff = min(5 * (2 ** (failure_count - 1)), 60)
+            logging.info(f'Attempting to reconnect in {backoff} seconds...')
+            time.sleep(backoff)
+
+            # Reinitialize client
+            try:
+                client, BOT_PROFILE = initialize_zulip_client()
+                logging.info('Reconnected successfully, resuming message processing')
+            except Exception as reinit_error:
+                logging.error(f'Failed to reinitialize client: {reinit_error}')
+                # Continue to next iteration, will retry or exit based on failure_count
+
+        except Exception as e:
+            failure_count += 1
+            logging.critical(f'Unexpected error in message loop (failure {failure_count}/{max_consecutive_failures}): {e}', exc_info=True)
+
+            if failure_count >= max_consecutive_failures:
+                logging.critical('Max consecutive failures reached. Exiting.')
+                sys.exit(1)
+
+            logging.info('Attempting recovery in 10 seconds...')
+            time.sleep(10)
+
+            # Attempt to reinitialize
+            try:
+                client, BOT_PROFILE = initialize_zulip_client()
+                logging.info('Client reinitialized after unexpected error')
+            except Exception as reinit_error:
+                logging.error(f'Failed to reinitialize after unexpected error: {reinit_error}')
 
 if __name__ == '__main__':
     main()

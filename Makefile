@@ -1,6 +1,6 @@
 IMAGE_NAME=harbor.eencloud.com/test/ritsuko
 UNIQ=$(shell git rev-parse --short HEAD)
-IMAGE_TAG=v1.4.2
+IMAGE_TAG=v1.5.0
 IMAGE_TAG_UNIQ= $(IMAGE_TAG)-$(UNIQ)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)
@@ -72,6 +72,7 @@ debug: build-debug ## Runs the debug container locally with debug tools
 		-e ZULIP_EMAIL=$(ZULIP_EMAIL) \
 		-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
 		-e ZULIP_SITE=$(ZULIP_SITE) \
+		-e RITSUKO_VERSION='$(IMAGE_TAG_UNIQ) running in devbox' \
 		-e LOG_LEVEL=DEBUG \
 		$(IMAGE_NAME):debug-$(UNIQ)
 
