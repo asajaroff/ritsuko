@@ -6,9 +6,10 @@ import threading
 import time
 
 from nodes import handle_node
-
 from fetchers import get_nautobot_devices
 from ai_context import get_system_prompt
+from validation import validate_ai_prompt, validate_node_name, sanitize_for_logging
+from rate_limiter import claude_rate_limiter
 
 # Import anthropic for AI functionality
 try:
@@ -108,6 +109,21 @@ def handle_ai(message, args, send_message_callback=None):
     # Join all args into a single prompt
     prompt = ' '.join(args)
 
+    # Validate prompt
+    is_valid, error_msg = validate_ai_prompt(prompt)
+    if not is_valid:
+        logging.warning(f"Invalid AI prompt from {message.get('sender_email', 'unknown')}: {error_msg}")
+        return f"Invalid prompt: {error_msg}"
+
+    # Log sanitized version of prompt
+    logging.info(f"AI prompt from {message.get('sender_email', 'unknown')}: {sanitize_for_logging(prompt, 100)}")
+
+    # Apply rate limiting
+    if not claude_rate_limiter.acquire(timeout=30.0):
+        logging.warning(f"Rate limit exceeded for AI request from {message.get('sender_email', 'unknown')}")
+        return ("I'm currently processing too many requests. Please try again in a moment.\n\n"
+                "If this persists, the bot may be experiencing high load. Contact your administrator.")
+
     try:
         # Send a processing message if we have a callback and it's expected to take time
         processing_notified = False
@@ -190,10 +206,25 @@ def handle_ai(message, args, send_message_callback=None):
 
 
 def handle_status(message, args):
-    """Handle the status command."""
-    # **TODO**: Readiness proble
-    # **TODO**: MCP connection probes
-    return "Bot is running normally. All systems operational."
+    """Handle the status command with rate limiter metrics."""
+    # Get rate limiter metrics
+    metrics = claude_rate_limiter.get_metrics()
+
+    status_text = f"""**Bot Status**: Running normally
+
+**Rate Limiter Metrics**:
+- Available tokens: {metrics['available_tokens']}/{metrics['burst_size']}
+- Total requests processed: {metrics['total_requests']}
+- Requests queued: {metrics['total_queued']}
+- Requests rejected: {metrics['total_rejected']}
+- Rate limit: {metrics['requests_per_minute']} requests/minute
+
+**Features**:
+- AI commands: {'✓' if ANTHROPIC_AVAILABLE and environ.get('ANTHROPIC_API_KEY') else '✗'}
+- Node queries: {'✓' if environ.get('GITHUB_MATCHBOX_TOKEN') else '✗'}
+- Nautobot queries: {'✓' if environ.get('NAUTOBOT_TOKEN') else '✗'}
+"""
+    return status_text
 
 def handle_clusters(message, args):
     """Handle the clusters command."""
@@ -228,6 +259,16 @@ c031  - aus2p1
 def handle_nautobot(args):
   if not args:
     return "Usage: `nautobot <node>` - Please provide node name."
+
+  # Validate all node names before processing
+  invalid_nodes = []
+  for node in args:
+    is_valid, error_msg = validate_node_name(node)
+    if not is_valid:
+      invalid_nodes.append(f"`{sanitize_for_logging(node, 50)}`: {error_msg}")
+
+  if invalid_nodes:
+    return "Invalid node name(s):\n" + "\n".join(invalid_nodes)
 
   all_devices = []
   for node in args:

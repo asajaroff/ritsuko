@@ -129,6 +129,9 @@ secrets:
   nautobotToken: ""
   # Nautobot API URL (e.g., https://nautobot.eencloud.com/api)
   nautobotUrl: ""
+  # Comma-separated list of authorized users (e.g., "user1@een.com,user2@een.com")
+  # If not set, the bot will use the default hardcoded list
+  authorizedUsers: ""
 
 # Environment variables configuration
 env:

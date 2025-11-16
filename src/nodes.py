@@ -3,6 +3,7 @@ from urllib3.util.retry import Retry
 import json
 import logging
 from os import environ
+from validation import validate_node_name, sanitize_for_logging
 
 sources = [
     {'vmall': 'jsqMEvfSk&var'}
@@ -43,6 +44,16 @@ headers = {
 def handle_node(message, nodes):
   if not nodes:
       return "Usage: `node <node>` - Please provide node name."
+
+  # Validate all node names before processing
+  invalid_nodes = []
+  for node in nodes:
+    is_valid, error_msg = validate_node_name(node)
+    if not is_valid:
+      invalid_nodes.append(f"`{sanitize_for_logging(node, 50)}`: {error_msg}")
+
+  if invalid_nodes:
+    return "Invalid node name(s):\n" + "\n".join(invalid_nodes)
 
   for node in nodes:
     node = node

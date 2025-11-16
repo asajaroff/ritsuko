@@ -89,6 +89,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "ritsuko-bot.fullname" . }}
                   key: nautobot-url
+            - name: AUTHORIZED_USERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ritsuko-bot.fullname" . }}
+                  key: authorized-users
+                  optional: true
             {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:

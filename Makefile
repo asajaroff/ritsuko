@@ -1,16 +1,28 @@
 IMAGE_NAME=harbor.eencloud.com/test/ritsuko
 UNIQ=$(shell git rev-parse --short HEAD)
 IMAGE_TAG=v1.5.0
-IMAGE_TAG_UNIQ= $(IMAGE_TAG)-$(UNIQ)
+IMAGE_TAG_UNIQ=$(IMAGE_TAG)-$(UNIQ)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)
-ANTHROPIC_API_KEY=$(shell env | grep ANTHROPIC_API_KEY | cut -d'=' --fields 2)
 
+ANTHROPIC_API_KEY=$(shell env | grep ANTHROPIC_API_KEY | cut -d'=' --fields 2)
 ZULIP_SITE=$(shell cat .env | grep ZULIP_SITE | cut -d'=' -f 2)
 ZULIP_EMAIL=$(shell cat .env | grep ZULIP_EMAIL | cut -d'=' -f 2)
 ZULIP_API_KEY=$(shell cat .env | grep ZULIP_API_KEY | cut -d'=' -f 2)
 GITHUB_MATCHOX_TOKEN=$(shell cat .env | grep GITHUB_MATCHOX_TOKEN | cut -d'=' -f 2)
+NAUTOBOT_TOKEN=$(shell cat .env | grep NAUTOBOT_TOKEN | cut -d'=' -f 2)
+NAUTOBOT_URL=$(shell cat .env | grep NAUTOBOT_URL | cut -d'=' -f 2)
 
+RUN_ARGS=\
+	-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
+	-e GITHUB_MATCHBOX_KEY=$(ZULIP_EMAIL) \
+	-e GITHUB_MATCHBOX_TOKEN=$(GITHUB_MATCHBOX_TOKEN) \
+	-e ZULIP_EMAIL=$(ZULIP_EMAIL) \
+	-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
+	-e ZULIP_SITE=$(ZULIP_SITE) \
+	-e NAUTOBOT_TOKEN=$(NAUTOBOT_TOKEN) \
+	-e NAUTOBOT_URL=$(NAUTOBOT_URL) \
+	-e RITSUKO_VERSION='Development version running in devbox' \
 
 .PHONY: help
 .DEFAULT_GOAL=help
@@ -42,7 +54,7 @@ push: build
 .PHONY: run
 run: build ## Runs the container locally with docker
 	docker run -ti \
-		-e RITSUKO_VERSION=$(IMAGE_UNIQ) \
+		$(RUN_ARGS) \
 		docker.io/$(IMAGE_UNIQ)
 
 .PHONY: release
@@ -54,26 +66,11 @@ release: ## Updates the git tag in chart/Chart.yaml, commits it and pushes it up
 dev: ## Runs the container locally
 	docker run -ti \
 		-v $(HOME)/.kube:/home/zulip/.kube \
-		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
-		-e GITHUB_MATCHBOX_KEY=$(ZULIP_EMAIL) \
-		-e GITHUB_MATCHBOX_TOKEN=$(GITHUB_MATCHBOX_TOKEN) \
-		-e ZULIP_EMAIL=$(ZULIP_EMAIL) \
-		-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
-		-e ZULIP_SITE=$(ZULIP_SITE) \
-		-e LOG_LEVEL=INFO \
 		$(IMAGE_UNIQ)
 
 debug: build-debug ## Runs the debug container locally with debug tools
-	docker run -ti \
+	docker run -ti $(RUN_ARGS) \
 		-v $(HOME)/.kube:/home/zulip/.kube \
-		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
-		-e GITHUB_MATCHBOX_KEY=$(ZULIP_EMAIL) \
-		-e GITHUB_MATCHBOX_TOKEN=$(GITHUB_MATCHBOX_TOKEN) \
-		-e ZULIP_EMAIL=$(ZULIP_EMAIL) \
-		-e ZULIP_API_KEY=$(ZULIP_API_KEY) \
-		-e ZULIP_SITE=$(ZULIP_SITE) \
-		-e RITSUKO_VERSION='$(IMAGE_TAG_UNIQ) running in devbox' \
-		-e LOG_LEVEL=DEBUG \
 		$(IMAGE_NAME):debug-$(UNIQ)
 
 
@@ -122,6 +119,7 @@ echo:
 	@echo ANTHROPIC: $(ANTHROPIC_API_KEY)
 	@echo $(ZULIP_SITE)
 	@echo $(ZULIP_EMAIL)
+	@echo $(RUN_ARGS)
 
 HELM_RELEASE_NAME = ritsuko-make
 helm-debug: ## Render the helm chart with debug information

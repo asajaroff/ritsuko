@@ -41,6 +41,7 @@ def validate_environment():
         'GITHUB_MATCHBOX_TOKEN': (r'^(ghp_|github_pat_).+', 'GitHub token format'),
         'NAUTOBOT_TOKEN': (r'^.{10,}$', 'at least 10 characters'),
         'NAUTOBOT_URL': (r'^https?://.+', 'valid URL'),
+        'AUTHORIZED_USERS': (r'^[\w\.\-@,\s]+$', 'comma-separated list of email addresses'),
     }
 
     # Validate required variables
@@ -99,10 +100,12 @@ validate_environment()
 # Initialize client as None - will be set in main() with retry logic
 client = None
 
-authorized_users = [
+# Load authorized users from environment variable with fallback to hardcoded list
+# Environment variable should be comma-separated list of emails
+DEFAULT_AUTHORIZED_USERS = [
     'asajaroff@een.com',
     'miniguez@een.com',
-    'user1088@chat.eencloud.com', # Manu
+    'user1088@chat.eencloud.com',
     'jchio@een.com',
     'pwhiteside@een.com',
     'mdiemel@een.com',
@@ -110,7 +113,16 @@ authorized_users = [
     'yolorunsola@een.com',
     'abrown@een.com',
     'gkameni@een.com',
-    ] # TODO: move authorized_users to environment variables
+]
+
+authorized_users_env = os.environ.get('AUTHORIZED_USERS', '')
+if authorized_users_env:
+    # Parse comma-separated list and strip whitespace
+    authorized_users = [email.strip() for email in authorized_users_env.split(',') if email.strip()]
+    logging.info(f'Loaded {len(authorized_users)} authorized users from AUTHORIZED_USERS environment variable')
+else:
+    authorized_users = DEFAULT_AUTHORIZED_USERS
+    logging.info(f'Using default authorized users list ({len(authorized_users)} users)')
 
 # Health check server
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -234,33 +246,71 @@ def handle_message(message):
             logging.warning(f'Unauthorized user: {message["sender_email"]}')
             response = 'I am not authorized to talk to you'
         else:
-            # Import handle_ai to check if we need to pass callback
-            from commands import parse_command, handle_ai
-            command, args = parse_command(message)
+            try:
+                # Import handle_ai to check if we need to pass callback
+                from commands import parse_command, handle_ai
+                command, args = parse_command(message)
 
-            # For AI command, pass the send_message callback for progress updates
-            if command == 'ai':
-                response = handle_ai(message, args, send_message_callback=send_message)
-            else:
-                response = execute_command(message)
+                # For AI command, pass the send_message callback for progress updates
+                if command == 'ai':
+                    response = handle_ai(message, args, send_message_callback=send_message)
+                else:
+                    response = execute_command(message)
 
-        # Send response
-        if message['type'] == 'private':
-            send_message({
-                'type': 'private',
-                'to': [r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
-                'content': response
-            })
-        elif message['type'] == 'stream':
-            send_message({
-                'type': 'stream',
-                'to': message['display_recipient'],
-                'subject': message['subject'],
-                'content': response
-            })
+            except KeyError as e:
+                logging.error(f'Missing expected data in message: {e}')
+                response = f"I encountered an error processing your request. Missing required field: {str(e)}\n\nPlease try again or contact support if this persists."
+            except ValueError as e:
+                logging.error(f'Invalid value in command processing: {e}')
+                response = f"I encountered an error with the command format: {str(e)}\n\nPlease check your command syntax and try again. Type `help` for available commands."
+            except TimeoutError as e:
+                logging.error(f'Request timeout: {e}')
+                response = "Your request timed out. This usually means the external service is slow or unavailable.\n\nPlease try again in a few moments."
+            except ConnectionError as e:
+                logging.error(f'Connection error during command execution: {e}')
+                response = "I couldn't connect to an external service required to process your request.\n\nPlease try again later. If this persists, contact your administrator."
+            except Exception as e:
+                logging.error(f'Unexpected error during command execution: {e}', exc_info=True)
+                response = f"An unexpected error occurred: {str(e)}\n\nPlease try again or contact your administrator if this persists."
+
+        # Send response (in a finally-like pattern to ensure user always gets feedback)
+        try:
+            if message['type'] == 'private':
+                send_message({
+                    'type': 'private',
+                    'to': [r['email'] for r in message['display_recipient'] if r['email'] != os.environ['ZULIP_EMAIL']],
+                    'content': response
+                })
+            elif message['type'] == 'stream':
+                send_message({
+                    'type': 'stream',
+                    'to': message['display_recipient'],
+                    'subject': message['subject'],
+                    'content': response
+                })
+        except Exception as send_error:
+            logging.error(f'Failed to send response message: {send_error}')
 
     except Exception as e:
-        logging.error(f'Error handling message: {e}')
+        logging.error(f'Critical error in message handler: {e}', exc_info=True)
+        # Try to send an error message to the user even if something went wrong
+        try:
+            error_response = "I encountered a critical error processing your message. Please try again or contact your administrator."
+            if message.get('type') == 'private':
+                send_message({
+                    'type': 'private',
+                    'to': [r['email'] for r in message.get('display_recipient', []) if r.get('email') != os.environ.get('ZULIP_EMAIL')],
+                    'content': error_response
+                })
+            elif message.get('type') == 'stream':
+                send_message({
+                    'type': 'stream',
+                    'to': message.get('display_recipient', ''),
+                    'subject': message.get('subject', 'Error'),
+                    'content': error_response
+                })
+        except Exception as final_error:
+            logging.error(f'Failed to send error message to user: {final_error}')
 
 
 def initialize_zulip_client():
