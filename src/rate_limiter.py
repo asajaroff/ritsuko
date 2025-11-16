@@ -5,10 +5,11 @@ This module provides a thread-safe rate limiter to prevent API quota exhaustion
 and manage concurrent requests to external APIs like Claude.
 """
 
-import time
-import threading
 import logging
+import threading
+import time
 from collections import deque
+from typing import Deque
 
 
 class RateLimiter:
@@ -40,7 +41,7 @@ class RateLimiter:
         self.lock = threading.Lock()
 
         # Queue for waiting requests
-        self.queue = deque()
+        self.queue: Deque[float] = deque()
         self.queue_max_size = 100  # Prevent unbounded queue growth
 
         # Metrics
@@ -48,7 +49,10 @@ class RateLimiter:
         self.total_queued = 0
         self.total_rejected = 0
 
-        logging.info(f"RateLimiter initialized: {requests_per_minute} requests/min, burst size: {burst_size}")
+        logging.info(
+            f"RateLimiter initialized: {requests_per_minute} requests/min, "
+            f"burst size: {burst_size}"
+        )
 
     def _refill_tokens(self):
         """Refill tokens based on elapsed time since last refill."""
@@ -77,7 +81,10 @@ class RateLimiter:
             # Check if queue is full
             if len(self.queue) >= self.queue_max_size:
                 self.total_rejected += 1
-                logging.warning(f"Rate limiter queue full ({self.queue_max_size}), rejecting request")
+                logging.warning(
+                    f"Rate limiter queue full ({self.queue_max_size}), "
+                    "rejecting request"
+                )
                 return False
 
             self._refill_tokens()
@@ -96,7 +103,9 @@ class RateLimiter:
         while True:
             elapsed = time.time() - start_time
             if elapsed >= timeout:
-                logging.warning(f"Request timed out after {timeout}s waiting for rate limit")
+                logging.warning(
+                    f"Request timed out after {timeout}s waiting for rate limit"
+                )
                 return False
 
             # Sleep for a short time then check again
@@ -141,13 +150,13 @@ class RateLimiter:
         with self.lock:
             self._refill_tokens()
             return {
-                'available_tokens': round(self.tokens, 2),
-                'total_requests': self.total_requests,
-                'total_queued': self.total_queued,
-                'total_rejected': self.total_rejected,
-                'queue_size': len(self.queue),
-                'requests_per_minute': self.requests_per_minute,
-                'burst_size': self.burst_size,
+                "available_tokens": round(self.tokens, 2),
+                "total_requests": self.total_requests,
+                "total_queued": self.total_queued,
+                "total_rejected": self.total_rejected,
+                "queue_size": len(self.queue),
+                "requests_per_minute": self.requests_per_minute,
+                "burst_size": self.burst_size,
             }
 
     def reset_metrics(self):

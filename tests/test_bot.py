@@ -1,29 +1,34 @@
-import os
-import unittest
-from unittest.mock import MagicMock, patch, call, Mock
-import sys
-import urllib.request
-import time
 import json
+import os
+import sys
+import time
+import unittest
+import urllib.request
+from unittest.mock import MagicMock, patch
 
 # Add src to path before imports
-sys.path.insert(0, 'src')
+sys.path.insert(0, "src")
 
 # Set up required environment variables before importing bot
-os.environ['ZULIP_EMAIL'] = 'bot@example.com'
-os.environ['ZULIP_API_KEY'] = 'test_api_key'
-os.environ['ZULIP_SITE'] = 'https://test.zulipchat.com'
-os.environ['NAUTOBOT_TOKEN'] = 'test_nautobot_token'
-os.environ['NAUTOBOT_URL'] = 'https://nautobot.test.com/api'
-os.environ['GITHUB_MATCHBOX_TOKEN'] = 'test_github_token'
+os.environ["ZULIP_EMAIL"] = "bot@example.com"
+os.environ["ZULIP_API_KEY"] = "test_api_key"
+os.environ["ZULIP_SITE"] = "https://test.zulipchat.com"
+os.environ["NAUTOBOT_TOKEN"] = "test_nautobot_token"
+os.environ["NAUTOBOT_URL"] = "https://nautobot.test.com/api"
+os.environ["GITHUB_MATCHBOX_TOKEN"] = "test_github_token"
 
 # Mock zulip module before importing bot
-sys.modules['zulip'] = MagicMock()
+sys.modules["zulip"] = MagicMock()
 
-import bot
-from commands import parse_command, execute_command, handle_nautobot, handle_ai
-from fetchers import get_nautobot_devices
-from nodes import handle_node
+import bot  # noqa: E402
+from commands import (  # noqa: E402
+    execute_command,
+    handle_ai,
+    handle_nautobot,
+    parse_command,
+)
+from fetchers import get_nautobot_devices  # noqa: E402
+from nodes import handle_node  # noqa: E402
 
 
 class TestSendMessage(unittest.TestCase):
@@ -36,12 +41,12 @@ class TestSendMessage(unittest.TestCase):
 
     def test_send_message_success(self):
         """Test successful message sending."""
-        self.mock_client.send_message.return_value = {'result': 'success'}
+        self.mock_client.send_message.return_value = {"result": "success"}
 
         message_dict = {
-            'type': 'private',
-            'to': ['test@example.com'],
-            'content': 'Test message'
+            "type": "private",
+            "to": ["test@example.com"],
+            "content": "Test message",
         }
 
         result = bot.send_message(message_dict)
@@ -52,14 +57,14 @@ class TestSendMessage(unittest.TestCase):
     def test_send_message_failure(self):
         """Test failed message sending."""
         self.mock_client.send_message.return_value = {
-            'result': 'error',
-            'msg': 'Invalid recipient'
+            "result": "error",
+            "msg": "Invalid recipient",
         }
 
         message_dict = {
-            'type': 'private',
-            'to': ['invalid@example.com'],
-            'content': 'Test message'
+            "type": "private",
+            "to": ["invalid@example.com"],
+            "content": "Test message",
         }
 
         result = bot.send_message(message_dict)
@@ -68,12 +73,12 @@ class TestSendMessage(unittest.TestCase):
 
     def test_send_message_exception(self):
         """Test exception handling in send_message."""
-        self.mock_client.send_message.side_effect = Exception('Network error')
+        self.mock_client.send_message.side_effect = Exception("Network error")
 
         message_dict = {
-            'type': 'private',
-            'to': ['test@example.com'],
-            'content': 'Test message'
+            "type": "private",
+            "to": ["test@example.com"],
+            "content": "Test message",
         }
 
         result = bot.send_message(message_dict)
@@ -88,117 +93,121 @@ class TestHandleMessage(unittest.TestCase):
         """Set up test fixtures."""
         self.mock_client = MagicMock()
         bot.client = self.mock_client
-        os.environ['ZULIP_EMAIL'] = 'bot@example.com'
+        os.environ["ZULIP_EMAIL"] = "bot@example.com"
         # Set up bot profile with a fixed user_id for testing
-        bot.BOT_PROFILE = {'user_id': 12345, 'full_name': 'Ritsuko', 'email': 'bot@example.com'}
+        bot.BOT_PROFILE = {
+            "user_id": 12345,
+            "full_name": "Ritsuko",
+            "email": "bot@example.com",
+        }
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_from_bot_itself(self, mock_send):
         """Test that bot ignores its own messages."""
         message = {
-            'sender_email': 'bot@example.com',
-            'content': 'Test message',
-            'type': 'private'
+            "sender_email": "bot@example.com",
+            "content": "Test message",
+            "type": "private",
         }
 
         bot.handle_message(message)
 
         mock_send.assert_not_called()
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_authorized_user_private(self, mock_send):
         """Test handling message from authorized user in private chat with mention."""
         mock_send.return_value = True
 
         message = {
-            'sender_email': 'asajaroff@een.com',
-            'content': '@**Ritsuko** status',
-            'type': 'private',
-            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
-            'display_recipient': [
-                {'email': 'asajaroff@een.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "sender_email": "asajaroff@een.com",
+            "content": "@**Ritsuko** status",
+            "type": "private",
+            "mentioned_user_ids": [12345],  # Bot's user_id from setUp
+            "display_recipient": [
+                {"email": "asajaroff@een.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
         bot.handle_message(message)
 
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
-        self.assertEqual(call_args['type'], 'private')
-        self.assertIn('running normally', call_args['content'])
+        self.assertEqual(call_args["type"], "private")
+        self.assertIn("running normally", call_args["content"])
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_authorized_user_stream(self, mock_send):
         """Test handling message from authorized user in stream with mention."""
         mock_send.return_value = True
 
         message = {
-            'sender_email': 'asajaroff@een.com',
-            'content': '@bot status',
-            'type': 'stream',
-            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
-            'display_recipient': 'general',
-            'subject': 'test topic'
+            "sender_email": "asajaroff@een.com",
+            "content": "@bot status",
+            "type": "stream",
+            "mentioned_user_ids": [12345],  # Bot's user_id from setUp
+            "display_recipient": "general",
+            "subject": "test topic",
         }
 
         bot.handle_message(message)
 
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
-        self.assertEqual(call_args['type'], 'stream')
-        self.assertEqual(call_args['to'], 'general')
-        self.assertEqual(call_args['subject'], 'test topic')
-        self.assertIn('running normally', call_args['content'])
+        self.assertEqual(call_args["type"], "stream")
+        self.assertEqual(call_args["to"], "general")
+        self.assertEqual(call_args["subject"], "test topic")
+        self.assertIn("running normally", call_args["content"])
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_unauthorized_user_private(self, mock_send):
         """Test handling message from unauthorized user in private chat with mention."""
         mock_send.return_value = True
 
         message = {
-            'sender_email': 'unauthorized@example.com',
-            'content': '@**Ritsuko** Hello bot',
-            'type': 'private',
-            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
-            'display_recipient': [
-                {'email': 'unauthorized@example.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "sender_email": "unauthorized@example.com",
+            "content": "@**Ritsuko** Hello bot",
+            "type": "private",
+            "mentioned_user_ids": [12345],  # Bot's user_id from setUp
+            "display_recipient": [
+                {"email": "unauthorized@example.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
         bot.handle_message(message)
 
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
-        self.assertIn('not authorized', call_args['content'])
+        self.assertIn("not authorized", call_args["content"])
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_unauthorized_user_stream(self, mock_send):
         """Test handling message from unauthorized user in stream with mention."""
         mock_send.return_value = True
 
         message = {
-            'sender_email': 'unauthorized@example.com',
-            'content': '@bot Hello bot',
-            'type': 'stream',
-            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
-            'display_recipient': 'general',
-            'subject': 'test topic'
+            "sender_email": "unauthorized@example.com",
+            "content": "@bot Hello bot",
+            "type": "stream",
+            "mentioned_user_ids": [12345],  # Bot's user_id from setUp
+            "display_recipient": "general",
+            "subject": "test topic",
         }
 
         bot.handle_message(message)
 
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
-        self.assertIn('not authorized', call_args['content'])
+        self.assertIn("not authorized", call_args["content"])
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_missing_field(self, mock_send):
         """Test handling message with missing required field."""
         message = {
-            'content': 'Hello bot',
-            'type': 'private'
+            "content": "Hello bot",
+            "type": "private",
             # Missing sender_email
         }
 
@@ -208,19 +217,19 @@ class TestHandleMessage(unittest.TestCase):
         # Should not try to send a message
         mock_send.assert_not_called()
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_group_pm_without_mention(self, mock_send):
         """Test that bot ignores group PMs when not mentioned."""
         message = {
-            'sender_email': 'asajaroff@een.com',
-            'content': 'status',
-            'type': 'private',
-            'mentioned_user_ids': [],  # Bot not mentioned
-            'display_recipient': [
-                {'email': 'asajaroff@een.com'},
-                {'email': 'miniguez@een.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "sender_email": "asajaroff@een.com",
+            "content": "status",
+            "type": "private",
+            "mentioned_user_ids": [],  # Bot not mentioned
+            "display_recipient": [
+                {"email": "asajaroff@een.com"},
+                {"email": "miniguez@een.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
         bot.handle_message(message)
@@ -228,21 +237,21 @@ class TestHandleMessage(unittest.TestCase):
         # Should not send a message since bot was not mentioned in group PM
         mock_send.assert_not_called()
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_group_pm_with_mention(self, mock_send):
         """Test that bot responds to group PMs when mentioned."""
         mock_send.return_value = True
 
         message = {
-            'sender_email': 'asajaroff@een.com',
-            'content': '@**Ritsuko** status',
-            'type': 'private',
-            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
-            'display_recipient': [
-                {'email': 'asajaroff@een.com'},
-                {'email': 'miniguez@een.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "sender_email": "asajaroff@een.com",
+            "content": "@**Ritsuko** status",
+            "type": "private",
+            "mentioned_user_ids": [12345],  # Bot's user_id from setUp
+            "display_recipient": [
+                {"email": "asajaroff@een.com"},
+                {"email": "miniguez@een.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
         bot.handle_message(message)
@@ -250,23 +259,23 @@ class TestHandleMessage(unittest.TestCase):
         # Should send a message since bot was mentioned in group PM
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
-        self.assertEqual(call_args['type'], 'private')
-        self.assertIn('running normally', call_args['content'])
+        self.assertEqual(call_args["type"], "private")
+        self.assertIn("running normally", call_args["content"])
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_one_on_one_pm_with_mention(self, mock_send):
         """Test that bot responds to 1-on-1 PMs when mentioned."""
         mock_send.return_value = True
 
         message = {
-            'sender_email': 'asajaroff@een.com',
-            'content': '@**Ritsuko** status',
-            'type': 'private',
-            'mentioned_user_ids': [12345],  # Bot's user_id from setUp
-            'display_recipient': [
-                {'email': 'asajaroff@een.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "sender_email": "asajaroff@een.com",
+            "content": "@**Ritsuko** status",
+            "type": "private",
+            "mentioned_user_ids": [12345],  # Bot's user_id from setUp
+            "display_recipient": [
+                {"email": "asajaroff@een.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
         bot.handle_message(message)
@@ -274,21 +283,21 @@ class TestHandleMessage(unittest.TestCase):
         # Should send a message when bot is mentioned
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
-        self.assertEqual(call_args['type'], 'private')
-        self.assertIn('running normally', call_args['content'])
+        self.assertEqual(call_args["type"], "private")
+        self.assertIn("running normally", call_args["content"])
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_one_on_one_pm_without_mention(self, mock_send):
         """Test that bot responds to 1-on-1 PMs even when not mentioned."""
         message = {
-            'sender_email': 'asajaroff@een.com',
-            'content': 'status',
-            'type': 'private',
-            'mentioned_user_ids': [],  # Bot not mentioned
-            'display_recipient': [
-                {'email': 'asajaroff@een.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "sender_email": "asajaroff@een.com",
+            "content": "status",
+            "type": "private",
+            "mentioned_user_ids": [],  # Bot not mentioned
+            "display_recipient": [
+                {"email": "asajaroff@een.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
         bot.handle_message(message)
@@ -296,19 +305,19 @@ class TestHandleMessage(unittest.TestCase):
         # Bot should respond in 1-on-1 conversations even without mention
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0][0]
-        self.assertEqual(call_args['type'], 'private')
-        self.assertIn('asajaroff@een.com', call_args['to'])
+        self.assertEqual(call_args["type"], "private")
+        self.assertIn("asajaroff@een.com", call_args["to"])
 
-    @patch('bot.send_message')
+    @patch("bot.send_message")
     def test_handle_message_stream_without_mention(self, mock_send):
         """Test that bot ignores stream messages when not mentioned."""
         message = {
-            'sender_email': 'asajaroff@een.com',
-            'content': 'status',
-            'type': 'stream',
-            'mentioned_user_ids': [],  # Bot not mentioned
-            'display_recipient': 'general',
-            'subject': 'test topic'
+            "sender_email": "asajaroff@een.com",
+            "content": "status",
+            "type": "stream",
+            "mentioned_user_ids": [],  # Bot not mentioned
+            "display_recipient": "general",
+            "subject": "test topic",
         }
 
         bot.handle_message(message)
@@ -322,34 +331,25 @@ class TestCommandParsing(unittest.TestCase):
 
     def test_parse_command_stream_message(self):
         """Test parsing command from stream message (second word)."""
-        message = {
-            'type': 'stream',
-            'content': '@bot help me please'
-        }
+        message = {"type": "stream", "content": "@bot help me please"}
 
         command, args = parse_command(message)
 
-        self.assertEqual(command, 'help')
-        self.assertEqual(args, ['me', 'please'])
+        self.assertEqual(command, "help")
+        self.assertEqual(args, ["me", "please"])
 
     def test_parse_command_private_message(self):
         """Test parsing command from private message (first word)."""
-        message = {
-            'type': 'private',
-            'content': 'ping test 123'
-        }
+        message = {"type": "private", "content": "ping test 123"}
 
         command, args = parse_command(message)
 
-        self.assertEqual(command, 'ping')
-        self.assertEqual(args, ['test', '123'])
+        self.assertEqual(command, "ping")
+        self.assertEqual(args, ["test", "123"])
 
     def test_parse_command_stream_no_command(self):
         """Test parsing stream message with only bot mention."""
-        message = {
-            'type': 'stream',
-            'content': '@bot'
-        }
+        message = {"type": "stream", "content": "@bot"}
 
         command, args = parse_command(message)
 
@@ -358,10 +358,7 @@ class TestCommandParsing(unittest.TestCase):
 
     def test_parse_command_empty_message(self):
         """Test parsing empty message."""
-        message = {
-            'type': 'private',
-            'content': ''
-        }
+        message = {"type": "private", "content": ""}
 
         command, args = parse_command(message)
 
@@ -370,315 +367,275 @@ class TestCommandParsing(unittest.TestCase):
 
     def test_execute_command_help(self):
         """Test help command execution."""
-        message = {
-            'type': 'private',
-            'content': 'help'
-        }
+        message = {"type": "private", "content": "help"}
 
         response = execute_command(message)
 
-        self.assertIn('Available Commands', response)
-        self.assertIn('help', response)
-        self.assertIn('status', response)
-        self.assertIn('node', response)
+        self.assertIn("Available Commands", response)
+        self.assertIn("help", response)
+        self.assertIn("status", response)
+        self.assertIn("node", response)
 
     def test_execute_command_status(self):
         """Test status command execution."""
-        message = {
-            'type': 'private',
-            'content': 'status'
-        }
+        message = {"type": "private", "content": "status"}
 
         response = execute_command(message)
 
-        self.assertIn('running normally', response)
-        self.assertIn('operational', response)
+        self.assertIn("running normally", response)
+        self.assertIn("operational", response)
 
     def test_execute_command_unknown(self):
         """Test unknown command execution."""
-        message = {
-            'type': 'private',
-            'content': 'unknowncommand'
-        }
+        message = {"type": "private", "content": "unknowncommand"}
 
         response = execute_command(message)
 
-        self.assertIn('Unknown command', response)
-        self.assertIn('unknowncommand', response)
+        self.assertIn("Unknown command", response)
+        self.assertIn("unknowncommand", response)
 
     def test_execute_command_stream_message(self):
         """Test command execution from stream message."""
-        message = {
-            'type': 'stream',
-            'content': '@bot status check'
-        }
+        message = {"type": "stream", "content": "@bot status check"}
 
         response = execute_command(message)
 
-        self.assertIn('running normally', response)
+        self.assertIn("running normally", response)
 
     def test_execute_command_version(self):
         """Test version command."""
-        message = {
-            'type': 'private',
-            'content': 'version'
-        }
+        message = {"type": "private", "content": "version"}
 
         response = execute_command(message)
 
-        self.assertIn('Ritsuko', response)
+        self.assertIn("Ritsuko", response)
         # Version string will vary based on environment
-        self.assertTrue('v1.0' in response or 'laptop' in response or 'local' in response.lower())
+        self.assertTrue(
+            "v1.0" in response or "laptop" in response or "local" in response.lower()
+        )
 
 
 class TestNodeCommand(unittest.TestCase):
     """Test the node command functionality."""
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_execute_command_node_with_single_node(self, mock_http):
         """Test node command with a single node name."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'private',
-            'content': 'node test-node-01'
-        }
+        message = {"type": "private", "content": "node test-node-01"}
 
         response = execute_command(message)
 
-        self.assertIn('test-node-01', response)
-        self.assertIn('Recent events', response)
-        self.assertIn('Terminal one-liners', response)
-        self.assertIn('Grafana links', response)
-        self.assertIn('graphs.eencloud.com', response)
-        self.assertIn('kubernetes-node-monitoring', response)
-        self.assertIn('node-exporter-detailed', response)
+        self.assertIn("test-node-01", response)
+        self.assertIn("Recent events", response)
+        self.assertIn("Terminal one-liners", response)
+        self.assertIn("Grafana links", response)
+        self.assertIn("graphs.eencloud.com", response)
+        self.assertIn("kubernetes-node-monitoring", response)
+        self.assertIn("node-exporter-detailed", response)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_execute_command_node_with_multiple_nodes(self, mock_http):
         """Test node command with multiple node names."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'private',
-            'content': 'node node1 node2 node3'
-        }
+        message = {"type": "private", "content": "node node1 node2 node3"}
 
         response = execute_command(message)
 
         # Should only process first node due to current implementation
-        self.assertIn('node1', response)
-        self.assertIn('Recent events', response)
-        self.assertIn('Grafana links', response)
+        self.assertIn("node1", response)
+        self.assertIn("Recent events", response)
+        self.assertIn("Grafana links", response)
 
     def test_execute_command_node_no_args(self):
         """Test node command without arguments."""
-        message = {
-            'type': 'private',
-            'content': 'node'
-        }
+        message = {"type": "private", "content": "node"}
 
         response = execute_command(message)
 
-        self.assertIn('Usage', response)
-        self.assertIn('node <node>', response)
-        self.assertIn('provide node name', response)
+        self.assertIn("Usage", response)
+        self.assertIn("node <node>", response)
+        self.assertIn("provide node name", response)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_execute_command_node_from_stream(self, mock_http):
         """Test node command from stream message."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'aus1p1',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "aus1p1",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'stream',
-            'content': '@bot node aus1p1-worker-01'
-        }
+        message = {"type": "stream", "content": "@bot node aus1p1-worker-01"}
 
         response = execute_command(message)
 
-        self.assertIn('aus1p1-worker-01', response)
-        self.assertIn('Grafana links', response)
+        self.assertIn("aus1p1-worker-01", response)
+        self.assertIn("Grafana links", response)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_node_command_includes_kubectl_commands(self, mock_http):
         """Test that node command output includes kubectl command examples."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'private',
-            'content': 'node test-node'
-        }
+        message = {"type": "private", "content": "node test-node"}
 
         response = execute_command(message)
 
-        self.assertIn('kubectl get events', response)
-        self.assertIn('systemctl status kubelet', response)
+        self.assertIn("kubectl get events", response)
+        self.assertIn("systemctl status kubelet", response)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_node_command_includes_grafana_dashboard_links(self, mock_http):
         """Test that node command includes all three Grafana dashboard links."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'private',
-            'content': 'node worker-node-123'
-        }
+        message = {"type": "private", "content": "node worker-node-123"}
 
         response = execute_command(message)
 
         # Check for all three Grafana dashboard links
-        self.assertIn('Kubernetes node monitoring', response)
-        self.assertIn('Node exporter detailed', response)
-        self.assertIn('Node monitoring -DC-', response)
+        self.assertIn("Kubernetes node monitoring", response)
+        self.assertIn("Node exporter detailed", response)
+        self.assertIn("Node monitoring -DC-", response)
 
         # Verify URL structure
-        self.assertIn('Node=worker-node-123', response)
-        self.assertIn('kubernetes_node=worker-node-123', response)
+        self.assertIn("Node=worker-node-123", response)
+        self.assertIn("kubernetes_node=worker-node-123", response)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_node_command_includes_journalctl_example(self, mock_http):
         """Test that node command includes journalctl SSH example."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'private',
-            'content': 'node prod-node-05'
-        }
+        message = {"type": "private", "content": "node prod-node-05"}
 
         response = execute_command(message)
 
-        self.assertIn('ssh prod-node-05', response)
-        self.assertIn('journalctl -u kubelet', response)
-        self.assertIn('--since yesterday', response)
+        self.assertIn("ssh prod-node-05", response)
+        self.assertIn("journalctl -u kubelet", response)
+        self.assertIn("--since yesterday", response)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_node_command_with_special_characters(self, mock_http):
         """Test node command with node name containing special characters."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'private',
-            'content': 'node aus1p1-worker-01.example.com'
-        }
+        message = {"type": "private", "content": "node aus1p1-worker-01.example.com"}
 
         response = execute_command(message)
 
-        self.assertIn('aus1p1-worker-01.example.com', response)
-        self.assertIn('Grafana links', response)
+        self.assertIn("aus1p1-worker-01.example.com", response)
+        self.assertIn("Grafana links", response)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_node_command_formatting(self, mock_http):
         """Test that node command response is properly formatted with markdown."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {
-            'type': 'private',
-            'content': 'node test-node'
-        }
+        message = {"type": "private", "content": "node test-node"}
 
         response = execute_command(message)
 
         # Check for markdown formatting elements
-        self.assertIn('##', response)  # Headers
-        self.assertIn('```', response)  # Code blocks
-        self.assertIn('[', response)    # Links
-        self.assertIn(']', response)
+        self.assertIn("##", response)  # Headers
+        self.assertIn("```", response)  # Code blocks
+        self.assertIn("[", response)  # Links
+        self.assertIn("]", response)
 
 
 class TestHealthCheckServer(unittest.TestCase):
@@ -704,9 +661,11 @@ class TestHealthCheckServer(unittest.TestCase):
         time.sleep(0.5)
 
         try:
-            response = urllib.request.urlopen('http://localhost:8082/healthz', timeout=2)
+            response = urllib.request.urlopen(
+                "http://localhost:8082/healthz", timeout=2
+            )
             self.assertEqual(response.status, 200)
-            self.assertEqual(response.read(), b'OK')
+            self.assertEqual(response.read(), b"OK")
         finally:
             server.shutdown()
 
@@ -718,9 +677,9 @@ class TestHealthCheckServer(unittest.TestCase):
         time.sleep(0.5)
 
         try:
-            response = urllib.request.urlopen('http://localhost:8083/readyz', timeout=2)
+            response = urllib.request.urlopen("http://localhost:8083/readyz", timeout=2)
             self.assertEqual(response.status, 200)
-            self.assertEqual(response.read(), b'OK')
+            self.assertEqual(response.read(), b"OK")
         finally:
             server.shutdown()
 
@@ -732,7 +691,7 @@ class TestHealthCheckServer(unittest.TestCase):
         time.sleep(0.5)
 
         try:
-            urllib.request.urlopen('http://localhost:8084/invalid', timeout=2)
+            urllib.request.urlopen("http://localhost:8084/invalid", timeout=2)
             self.fail("Should have raised HTTPError")
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 404)
@@ -743,7 +702,7 @@ class TestHealthCheckServer(unittest.TestCase):
 class TestNautobotFetcher(unittest.TestCase):
     """Test the get_nautobot_devices function."""
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_success(self, mock_pool_manager):
         """Test successful device fetch from Nautobot."""
         mock_http = MagicMock()
@@ -751,146 +710,135 @@ class TestNautobotFetcher(unittest.TestCase):
 
         # Mock response data
         response_data = {
-            'count': 2,
-            'results': [
+            "count": 2,
+            "results": [
                 {
-                    'name': 'test-node-01',
-                    'url': 'https://nautobot.test.com/devices/1/',
-                    'rack': {
-                        'id': 'rack-01',
-                        'url': 'https://nautobot.test.com/racks/1/'
+                    "name": "test-node-01",
+                    "url": "https://nautobot.test.com/devices/1/",
+                    "rack": {
+                        "id": "rack-01",
+                        "url": "https://nautobot.test.com/racks/1/",
                     },
-                    'custom_fields': {
-                        'kubernetes_version': 'v1.27.0'
-                    }
+                    "custom_fields": {"kubernetes_version": "v1.27.0"},
                 },
                 {
-                    'name': 'test-node-02',
-                    'url': 'https://nautobot.test.com/devices/2/',
-                    'rack': {
-                        'id': 'rack-02',
-                        'url': 'https://nautobot.test.com/racks/2/'
+                    "name": "test-node-02",
+                    "url": "https://nautobot.test.com/devices/2/",
+                    "rack": {
+                        "id": "rack-02",
+                        "url": "https://nautobot.test.com/racks/2/",
                     },
-                    'custom_fields': {
-                        'kubernetes_version': 'v1.28.0'
-                    }
-                }
-            ]
+                    "custom_fields": {"kubernetes_version": "v1.28.0"},
+                },
+            ],
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_response.data = json.dumps(response_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('test-node')
+        result = get_nautobot_devices("test-node")
 
         self.assertEqual(len(result), 2)
-        self.assertIn('test-node-01', result[0])
-        self.assertIn('v1.27.0', result[0])
-        self.assertIn('rack-01', result[0])
-        self.assertIn('test-node-02', result[1])
-        self.assertIn('v1.28.0', result[1])
+        self.assertIn("test-node-01", result[0])
+        self.assertIn("v1.27.0", result[0])
+        self.assertIn("rack-01", result[0])
+        self.assertIn("test-node-02", result[1])
+        self.assertIn("v1.28.0", result[1])
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_empty_results(self, mock_pool_manager):
         """Test Nautobot fetch with no results."""
         mock_http = MagicMock()
         mock_pool_manager.return_value = mock_http
 
-        response_data = {
-            'count': 0,
-            'results': []
-        }
+        response_data = {"count": 0, "results": []}
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_response.data = json.dumps(response_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('nonexistent-node')
+        result = get_nautobot_devices("nonexistent-node")
 
         self.assertEqual(len(result), 0)
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_null_rack(self, mock_pool_manager):
         """Test device with null rack field."""
         mock_http = MagicMock()
         mock_pool_manager.return_value = mock_http
 
         response_data = {
-            'count': 1,
-            'results': [
+            "count": 1,
+            "results": [
                 {
-                    'name': 'test-node',
-                    'url': 'https://nautobot.test.com/devices/1/',
-                    'rack': None,
-                    'custom_fields': {
-                        'kubernetes_version': 'v1.27.0'
-                    }
+                    "name": "test-node",
+                    "url": "https://nautobot.test.com/devices/1/",
+                    "rack": None,
+                    "custom_fields": {"kubernetes_version": "v1.27.0"},
                 }
-            ]
+            ],
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_response.data = json.dumps(response_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('test-node')
+        result = get_nautobot_devices("test-node")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('test-node', result[0])
-        self.assertIn('N/A', result[0])  # Should show N/A for missing rack
+        self.assertIn("test-node", result[0])
+        self.assertIn("N/A", result[0])  # Should show N/A for missing rack
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_null_kubernetes_version(self, mock_pool_manager):
         """Test device with null kubernetes_version."""
         mock_http = MagicMock()
         mock_pool_manager.return_value = mock_http
 
         response_data = {
-            'count': 1,
-            'results': [
+            "count": 1,
+            "results": [
                 {
-                    'name': 'test-node',
-                    'url': 'https://nautobot.test.com/devices/1/',
-                    'rack': {
-                        'id': 'rack-01',
-                        'url': 'https://nautobot.test.com/racks/1/'
+                    "name": "test-node",
+                    "url": "https://nautobot.test.com/devices/1/",
+                    "rack": {
+                        "id": "rack-01",
+                        "url": "https://nautobot.test.com/racks/1/",
                     },
-                    'custom_fields': {
-                        'kubernetes_version': None
-                    }
+                    "custom_fields": {"kubernetes_version": None},
                 }
-            ]
+            ],
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_response.data = json.dumps(response_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('test-node')
+        result = get_nautobot_devices("test-node")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('N/A', result[0])  # Should show N/A for null k8s version
+        self.assertIn("N/A", result[0])  # Should show N/A for null k8s version
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_network_error(self, mock_pool_manager):
         """Test handling of network errors."""
         mock_http = MagicMock()
         mock_pool_manager.return_value = mock_http
-        mock_http.request.side_effect = OSError('Connection failed')
+        mock_http.request.side_effect = OSError("Connection failed")
 
-        result = get_nautobot_devices('test-node')
+        result = get_nautobot_devices("test-node")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('Error', result[0])
-        self.assertIn('Network error', result[0])
-        self.assertIn('Connection failed', result[0])
+        self.assertIn("Error", result[0])
+        self.assertIn("Network error", result[0])
+        self.assertIn("Connection failed", result[0])
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_json_decode_error(self, mock_pool_manager):
         """Test handling of invalid JSON response."""
         mock_http = MagicMock()
@@ -898,48 +846,48 @@ class TestNautobotFetcher(unittest.TestCase):
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = b'Invalid JSON'
+        mock_response.data = b"Invalid JSON"
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('test-node')
+        result = get_nautobot_devices("test-node")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('Error', result[0])
-        self.assertIn('Failed to parse', result[0])
-        self.assertIn('test-node', result[0])
+        self.assertIn("Error", result[0])
+        self.assertIn("Failed to parse", result[0])
+        self.assertIn("test-node", result[0])
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_missing_custom_fields(self, mock_pool_manager):
         """Test device with missing custom_fields entirely."""
         mock_http = MagicMock()
         mock_pool_manager.return_value = mock_http
 
         response_data = {
-            'count': 1,
-            'results': [
+            "count": 1,
+            "results": [
                 {
-                    'name': 'test-node',
-                    'url': 'https://nautobot.test.com/devices/1/',
-                    'rack': {
-                        'id': 'rack-01',
-                        'url': 'https://nautobot.test.com/racks/1/'
+                    "name": "test-node",
+                    "url": "https://nautobot.test.com/devices/1/",
+                    "rack": {
+                        "id": "rack-01",
+                        "url": "https://nautobot.test.com/racks/1/",
                     },
-                    'custom_fields': None
+                    "custom_fields": None,
                 }
-            ]
+            ],
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(response_data).encode('utf-8')
+        mock_response.data = json.dumps(response_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('test-node')
+        result = get_nautobot_devices("test-node")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('N/A', result[0])  # Should show N/A for missing custom_fields
+        self.assertIn("N/A", result[0])  # Should show N/A for missing custom_fields
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_not_found_404(self, mock_pool_manager):
         """Test get_nautobot_devices when device doesn't exist (404 error)."""
         mock_http = MagicMock()
@@ -950,14 +898,14 @@ class TestNautobotFetcher(unittest.TestCase):
         mock_response.data = b'{"message": "Not Found"}'
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('nonexistent-device')
+        result = get_nautobot_devices("nonexistent-device")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('Error', result[0])
-        self.assertIn('not found', result[0])
-        self.assertIn('nonexistent-device', result[0])
+        self.assertIn("Error", result[0])
+        self.assertIn("not found", result[0])
+        self.assertIn("nonexistent-device", result[0])
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_access_forbidden_403(self, mock_pool_manager):
         """Test get_nautobot_devices when access is forbidden (403 error)."""
         mock_http = MagicMock()
@@ -968,15 +916,15 @@ class TestNautobotFetcher(unittest.TestCase):
         mock_response.data = b'{"message": "Forbidden"}'
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('restricted-device')
+        result = get_nautobot_devices("restricted-device")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('Error', result[0])
-        self.assertIn('forbidden', result[0])
-        self.assertIn('restricted-device', result[0])
-        self.assertIn('token', result[0])
+        self.assertIn("Error", result[0])
+        self.assertIn("forbidden", result[0])
+        self.assertIn("restricted-device", result[0])
+        self.assertIn("token", result[0])
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_http_error_500(self, mock_pool_manager):
         """Test get_nautobot_devices with server error (500)."""
         mock_http = MagicMock()
@@ -987,243 +935,237 @@ class TestNautobotFetcher(unittest.TestCase):
         mock_response.data = b'{"message": "Internal Server Error"}'
         mock_http.request.return_value = mock_response
 
-        result = get_nautobot_devices('test-device')
+        result = get_nautobot_devices("test-device")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('Error', result[0])
-        self.assertIn('Failed to retrieve', result[0])
-        self.assertIn('500', result[0])
+        self.assertIn("Error", result[0])
+        self.assertIn("Failed to retrieve", result[0])
+        self.assertIn("500", result[0])
 
-    @patch('fetchers.urllib3.PoolManager')
+    @patch("fetchers.urllib3.PoolManager")
     def test_get_nautobot_devices_unexpected_exception(self, mock_pool_manager):
         """Test get_nautobot_devices with unexpected exception."""
         mock_http = MagicMock()
         mock_pool_manager.return_value = mock_http
-        mock_http.request.side_effect = Exception('Unexpected error')
+        mock_http.request.side_effect = Exception("Unexpected error")
 
-        result = get_nautobot_devices('test-device')
+        result = get_nautobot_devices("test-device")
 
         self.assertEqual(len(result), 1)
-        self.assertIn('Error', result[0])
-        self.assertIn('unexpected error', result[0])
-        self.assertIn('Unexpected error', result[0])
+        self.assertIn("Error", result[0])
+        self.assertIn("unexpected error", result[0])
+        self.assertIn("Unexpected error", result[0])
 
 
 class TestNautobotCommand(unittest.TestCase):
     """Test the nautobot command functionality."""
 
-    @patch('commands.get_nautobot_devices')
+    @patch("commands.get_nautobot_devices")
     def test_handle_nautobot_single_node(self, mock_get_devices):
         """Test nautobot command with single node."""
         mock_get_devices.return_value = [
-            'Device: node1\nRack: rack1\nKubernetes: v1.27.0'
+            "Device: node1\nRack: rack1\nKubernetes: v1.27.0"
         ]
 
-        result = handle_nautobot(['node1'])
+        result = handle_nautobot(["node1"])
 
-        self.assertIn('node1', result)
-        self.assertIn('rack1', result)
-        mock_get_devices.assert_called_once_with('node1')
+        self.assertIn("node1", result)
+        self.assertIn("rack1", result)
+        mock_get_devices.assert_called_once_with("node1")
 
-    @patch('commands.get_nautobot_devices')
+    @patch("commands.get_nautobot_devices")
     def test_handle_nautobot_multiple_nodes(self, mock_get_devices):
         """Test nautobot command with multiple nodes."""
         mock_get_devices.side_effect = [
-            ['Device: node1\nRack: rack1\nKubernetes: v1.27.0'],
-            ['Device: node2\nRack: rack2\nKubernetes: v1.28.0']
+            ["Device: node1\nRack: rack1\nKubernetes: v1.27.0"],
+            ["Device: node2\nRack: rack2\nKubernetes: v1.28.0"],
         ]
 
-        result = handle_nautobot(['node1', 'node2'])
+        result = handle_nautobot(["node1", "node2"])
 
-        self.assertIn('node1', result)
-        self.assertIn('node2', result)
+        self.assertIn("node1", result)
+        self.assertIn("node2", result)
         self.assertEqual(mock_get_devices.call_count, 2)
 
-    @patch('commands.get_nautobot_devices')
+    @patch("commands.get_nautobot_devices")
     def test_handle_nautobot_no_results(self, mock_get_devices):
         """Test nautobot command with no results."""
         mock_get_devices.return_value = []
 
-        result = handle_nautobot(['nonexistent'])
+        result = handle_nautobot(["nonexistent"])
 
-        self.assertEqual(result, '')
+        self.assertEqual(result, "")
 
     def test_execute_command_nautobot(self):
         """Test nautobot command through execute_command."""
-        with patch('commands.get_nautobot_devices') as mock_get_devices:
+        with patch("commands.get_nautobot_devices") as mock_get_devices:
             mock_get_devices.return_value = [
-                'Device: test-node\nRack: rack1\nKubernetes: v1.27.0'
+                "Device: test-node\nRack: rack1\nKubernetes: v1.27.0"
             ]
 
-            message = {
-                'type': 'private',
-                'content': 'nautobot test-node'
-            }
+            message = {"type": "private", "content": "nautobot test-node"}
 
             response = execute_command(message)
 
-            self.assertIn('test-node', response)
+            self.assertIn("test-node", response)
 
     def test_execute_command_nautobot_from_stream(self):
         """Test nautobot command from stream message."""
-        with patch('commands.get_nautobot_devices') as mock_get_devices:
+        with patch("commands.get_nautobot_devices") as mock_get_devices:
             mock_get_devices.return_value = [
-                'Device: aus1-node\nRack: rack1\nKubernetes: v1.27.0'
+                "Device: aus1-node\nRack: rack1\nKubernetes: v1.27.0"
             ]
 
-            message = {
-                'type': 'stream',
-                'content': '@bot nautobot aus1-node'
-            }
+            message = {"type": "stream", "content": "@bot nautobot aus1-node"}
 
             response = execute_command(message)
 
-            self.assertIn('aus1-node', response)
+            self.assertIn("aus1-node", response)
 
 
 class TestNodeCommandEnhanced(unittest.TestCase):
     """Enhanced tests for node command functionality."""
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_with_valid_matchbox_data(self, mock_http):
         """Test handle_node with valid matchbox response."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'aus1p1',
-                'public_ip': '203.0.113.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "aus1p1",
+                "public_ip": "203.0.113.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['test-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["test-node"])
 
-        self.assertIn('test-node', result)
-        self.assertIn('aus1p1', result)
-        self.assertIn('203.0.113.1', result)
-        self.assertIn('v1.27.0', result)
-        self.assertIn('3815.2.0', result)
+        self.assertIn("test-node", result)
+        self.assertIn("aus1p1", result)
+        self.assertIn("203.0.113.1", result)
+        self.assertIn("v1.27.0", result)
+        self.assertIn("3815.2.0", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_includes_grafana_links(self, mock_http):
         """Test that handle_node includes all Grafana links."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-cluster',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-cluster",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['worker-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["worker-node"])
 
         # Check for Grafana dashboard links
-        self.assertIn('Kubernetes node monitoring', result)
-        self.assertIn('Node exporter detailed', result)
-        self.assertIn('Node monitoring -DC-', result)
-        self.assertIn('graphs.eencloud.com', result)
+        self.assertIn("Kubernetes node monitoring", result)
+        self.assertIn("Node exporter detailed", result)
+        self.assertIn("Node monitoring -DC-", result)
+        self.assertIn("graphs.eencloud.com", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_includes_kubectl_commands(self, mock_http):
         """Test that handle_node includes kubectl command examples."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'aus1p1',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "aus1p1",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['test-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["test-node"])
 
         # Check for kubectl commands
-        self.assertIn('kubectl get events', result)
-        self.assertIn('--context aus1p1', result)
-        self.assertIn('--field-selector involvedObject.name=test-node', result)
+        self.assertIn("kubectl get events", result)
+        self.assertIn("--context aus1p1", result)
+        self.assertIn("--field-selector involvedObject.name=test-node", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_includes_ssh_commands(self, mock_http):
         """Test that handle_node includes SSH command examples."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'fra1p1',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "fra1p1",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['prod-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["prod-node"])
 
         # Check for SSH commands
-        self.assertIn('ssh prod-node', result)
-        self.assertIn('systemctl status kubelet.service', result)
-        self.assertIn('systemctl status containerd.service', result)
-        self.assertIn('journalctl -u kubelet', result)
+        self.assertIn("ssh prod-node", result)
+        self.assertIn("systemctl status kubelet.service", result)
+        self.assertIn("systemctl status containerd.service", result)
+        self.assertIn("journalctl -u kubelet", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_markdown_formatting(self, mock_http):
         """Test that handle_node returns properly formatted markdown."""
         matchbox_data = {
-            'metadata': {
-                'pod': 'test-pod',
-                'public_ip': '10.0.0.1',
-                'kubernetes_version': 'v1.27.0',
-                'flatcar_version': '3815.2.0'
+            "metadata": {
+                "pod": "test-pod",
+                "public_ip": "10.0.0.1",
+                "kubernetes_version": "v1.27.0",
+                "flatcar_version": "3815.2.0",
             }
         }
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = json.dumps(matchbox_data).encode('utf-8')
+        mock_response.data = json.dumps(matchbox_data).encode("utf-8")
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['test-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["test-node"])
 
         # Check for markdown elements
-        self.assertIn('###', result)  # Headers
-        self.assertIn('```', result)  # Code blocks
-        self.assertIn('**', result)   # Bold text
-        self.assertIn('[', result)    # Links
-        self.assertIn(']', result)
-        self.assertIn('(', result)
+        self.assertIn("###", result)  # Headers
+        self.assertIn("```", result)  # Code blocks
+        self.assertIn("**", result)  # Bold text
+        self.assertIn("[", result)  # Links
+        self.assertIn("]", result)
+        self.assertIn("(", result)
 
     def test_handle_node_no_arguments(self):
         """Test handle_node with no arguments."""
-        message = {'type': 'private'}
+        message = {"type": "private"}
         result = handle_node(message, [])
 
-        self.assertIn('Usage', result)
-        self.assertIn('node <node>', result)
+        self.assertIn("Usage", result)
+        self.assertIn("node <node>", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_not_found_404(self, mock_http):
         """Test handle_node when node doesn't exist (404 error)."""
         mock_response = MagicMock()
@@ -1231,15 +1173,15 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         mock_response.data = b'{"message": "Not Found"}'
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['nonexistent-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["nonexistent-node"])
 
-        self.assertIn('Error', result)
-        self.assertIn('not found', result)
-        self.assertIn('nonexistent-node', result)
-        self.assertIn('nautobot', result)
+        self.assertIn("Error", result)
+        self.assertIn("not found", result)
+        self.assertIn("nonexistent-node", result)
+        self.assertIn("nautobot", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_access_forbidden_403(self, mock_http):
         """Test handle_node when access is forbidden (403 error)."""
         mock_response = MagicMock()
@@ -1247,15 +1189,15 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         mock_response.data = b'{"message": "Forbidden"}'
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['restricted-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["restricted-node"])
 
-        self.assertIn('Error', result)
-        self.assertIn('forbidden', result)
-        self.assertIn('restricted-node', result)
-        self.assertIn('token', result)
+        self.assertIn("Error", result)
+        self.assertIn("forbidden", result)
+        self.assertIn("restricted-node", result)
+        self.assertIn("token", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_http_error_500(self, mock_http):
         """Test handle_node with server error (500)."""
         mock_response = MagicMock()
@@ -1263,39 +1205,39 @@ class TestNodeCommandEnhanced(unittest.TestCase):
         mock_response.data = b'{"message": "Internal Server Error"}'
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['test-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["test-node"])
 
-        self.assertIn('Error', result)
-        self.assertIn('Failed to retrieve', result)
-        self.assertIn('500', result)
+        self.assertIn("Error", result)
+        self.assertIn("Failed to retrieve", result)
+        self.assertIn("500", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_json_decode_error(self, mock_http):
         """Test handle_node with invalid JSON response."""
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.data = b'Invalid JSON content'
+        mock_response.data = b"Invalid JSON content"
         mock_http.request.return_value = mock_response
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['test-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["test-node"])
 
-        self.assertIn('Error', result)
-        self.assertIn('Failed to parse', result)
-        self.assertIn('test-node', result)
+        self.assertIn("Error", result)
+        self.assertIn("Failed to parse", result)
+        self.assertIn("test-node", result)
 
-    @patch('nodes.http')
+    @patch("nodes.http")
     def test_handle_node_unexpected_exception(self, mock_http):
         """Test handle_node with unexpected exception."""
-        mock_http.request.side_effect = Exception('Network error')
+        mock_http.request.side_effect = Exception("Network error")
 
-        message = {'type': 'private'}
-        result = handle_node(message, ['test-node'])
+        message = {"type": "private"}
+        result = handle_node(message, ["test-node"])
 
-        self.assertIn('Error', result)
-        self.assertIn('unexpected error', result)
-        self.assertIn('Network error', result)
+        self.assertIn("Error", result)
+        self.assertIn("unexpected error", result)
+        self.assertIn("Network error", result)
 
 
 class TestAICommand(unittest.TestCase):
@@ -1304,41 +1246,35 @@ class TestAICommand(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Set the ANTHROPIC_API_KEY for tests
-        os.environ['ANTHROPIC_API_KEY'] = 'test_anthropic_key'
+        os.environ["ANTHROPIC_API_KEY"] = "test_anthropic_key"
 
     def tearDown(self):
         """Clean up after tests."""
         # Clean up environment variable
-        if 'ANTHROPIC_API_KEY' in os.environ:
-            del os.environ['ANTHROPIC_API_KEY']
+        if "ANTHROPIC_API_KEY" in os.environ:
+            del os.environ["ANTHROPIC_API_KEY"]
 
     def test_handle_ai_no_anthropic_key(self):
         """Test AI command without ANTHROPIC_API_KEY set."""
-        del os.environ['ANTHROPIC_API_KEY']
+        del os.environ["ANTHROPIC_API_KEY"]
 
-        message = {
-            'type': 'private',
-            'content': 'ai What is the capital of France?'
-        }
+        message = {"type": "private", "content": "ai What is the capital of France?"}
 
-        response = handle_ai(message, ['What', 'is', 'the', 'capital', 'of', 'France?'])
+        response = handle_ai(message, ["What", "is", "the", "capital", "of", "France?"])
 
-        self.assertIn('not available', response)
-        self.assertIn('ANTHROPIC_API_KEY', response)
+        self.assertIn("not available", response)
+        self.assertIn("ANTHROPIC_API_KEY", response)
 
     def test_handle_ai_no_args(self):
         """Test AI command without arguments."""
-        message = {
-            'type': 'private',
-            'content': 'ai'
-        }
+        message = {"type": "private", "content": "ai"}
 
         response = handle_ai(message, [])
 
-        self.assertIn('Usage', response)
-        self.assertIn('provide a prompt', response)
+        self.assertIn("Usage", response)
+        self.assertIn("provide a prompt", response)
 
-    @patch('commands.anthropic.Anthropic')
+    @patch("commands.anthropic.Anthropic")
     def test_handle_ai_success(self, mock_anthropic_class):
         """Test successful AI command execution."""
         # Mock the Anthropic client and response
@@ -1352,20 +1288,20 @@ class TestAICommand(unittest.TestCase):
         mock_client.messages.create.return_value = mock_response
 
         message = {
-            'type': 'private',
-            'content': 'ai What is the capital of France?',
-            'display_recipient': [
-                {'email': 'test@example.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "type": "private",
+            "content": "ai What is the capital of France?",
+            "display_recipient": [
+                {"email": "test@example.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
-        response = handle_ai(message, ['What', 'is', 'the', 'capital', 'of', 'France?'])
+        response = handle_ai(message, ["What", "is", "the", "capital", "of", "France?"])
 
         self.assertEqual(response, "The capital of France is Paris.")
         mock_client.messages.create.assert_called_once()
 
-    @patch('commands.anthropic.Anthropic')
+    @patch("commands.anthropic.Anthropic")
     def test_handle_ai_empty_response(self, mock_anthropic_class):
         """Test AI command with empty response."""
         mock_client = MagicMock()
@@ -1376,40 +1312,40 @@ class TestAICommand(unittest.TestCase):
         mock_client.messages.create.return_value = mock_response
 
         message = {
-            'type': 'private',
-            'content': 'ai test',
-            'display_recipient': [
-                {'email': 'test@example.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "type": "private",
+            "content": "ai test",
+            "display_recipient": [
+                {"email": "test@example.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
-        response = handle_ai(message, ['test'])
+        response = handle_ai(message, ["test"])
 
-        self.assertIn('empty response', response)
+        self.assertIn("empty response", response)
 
-    @patch('commands.anthropic.Anthropic')
+    @patch("commands.anthropic.Anthropic")
     def test_handle_ai_api_error(self, mock_anthropic_class):
         """Test AI command with API error."""
         mock_client = MagicMock()
         mock_anthropic_class.return_value = mock_client
-        mock_client.messages.create.side_effect = Exception('API Error')
+        mock_client.messages.create.side_effect = Exception("API Error")
 
         message = {
-            'type': 'private',
-            'content': 'ai test',
-            'display_recipient': [
-                {'email': 'test@example.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "type": "private",
+            "content": "ai test",
+            "display_recipient": [
+                {"email": "test@example.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
-        response = handle_ai(message, ['test'])
+        response = handle_ai(message, ["test"])
 
-        self.assertIn('error occurred', response)
-        self.assertIn('API Error', response)
+        self.assertIn("error occurred", response)
+        self.assertIn("API Error", response)
 
-    @patch('commands.anthropic.Anthropic')
+    @patch("commands.anthropic.Anthropic")
     def test_handle_ai_with_callback(self, mock_anthropic_class):
         """Test AI command with send_message callback for long-running requests."""
         mock_client = MagicMock()
@@ -1427,27 +1363,27 @@ class TestAICommand(unittest.TestCase):
         mock_client.messages.create.side_effect = slow_create
 
         message = {
-            'type': 'private',
-            'content': 'ai test',
-            'display_recipient': [
-                {'email': 'test@example.com'},
-                {'email': 'bot@example.com'}
-            ]
+            "type": "private",
+            "content": "ai test",
+            "display_recipient": [
+                {"email": "test@example.com"},
+                {"email": "bot@example.com"},
+            ],
         }
 
-        callback_called = {'called': False}
+        callback_called = {"called": False}
 
         def mock_callback(msg):
-            callback_called['called'] = True
-            self.assertIn('Processing', msg['content'])
+            callback_called["called"] = True
+            self.assertIn("Processing", msg["content"])
 
-        response = handle_ai(message, ['test'], send_message_callback=mock_callback)
+        response = handle_ai(message, ["test"], send_message_callback=mock_callback)
 
         self.assertEqual(response, "Slow response")
         # Callback should have been called due to 6 second delay
-        self.assertTrue(callback_called['called'])
+        self.assertTrue(callback_called["called"])
 
-    @patch('commands.anthropic.Anthropic')
+    @patch("commands.anthropic.Anthropic")
     def test_handle_ai_stream_message(self, mock_anthropic_class):
         """Test AI command from stream message."""
         mock_client = MagicMock()
@@ -1460,19 +1396,19 @@ class TestAICommand(unittest.TestCase):
         mock_client.messages.create.return_value = mock_response
 
         message = {
-            'type': 'stream',
-            'content': '@bot ai test',
-            'display_recipient': 'general',
-            'subject': 'test topic'
+            "type": "stream",
+            "content": "@bot ai test",
+            "display_recipient": "general",
+            "subject": "test topic",
         }
 
-        response = handle_ai(message, ['test'])
+        response = handle_ai(message, ["test"])
 
         self.assertEqual(response, "Stream response")
 
     def test_execute_command_ai(self):
         """Test AI command through execute_command."""
-        with patch('commands.anthropic.Anthropic') as mock_anthropic_class:
+        with patch("commands.anthropic.Anthropic") as mock_anthropic_class:
             mock_client = MagicMock()
             mock_anthropic_class.return_value = mock_client
 
@@ -1483,12 +1419,12 @@ class TestAICommand(unittest.TestCase):
             mock_client.messages.create.return_value = mock_response
 
             message = {
-                'type': 'private',
-                'content': 'ai test question',
-                'display_recipient': [
-                    {'email': 'test@example.com'},
-                    {'email': 'bot@example.com'}
-                ]
+                "type": "private",
+                "content": "ai test question",
+                "display_recipient": [
+                    {"email": "test@example.com"},
+                    {"email": "bot@example.com"},
+                ],
             }
 
             response = execute_command(message)
@@ -1496,5 +1432,5 @@ class TestAICommand(unittest.TestCase):
             self.assertEqual(response, "Test AI response")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

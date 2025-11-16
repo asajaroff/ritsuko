@@ -3,8 +3,8 @@ FROM python:3.13-slim-bookworm
 # No additional system dependencies needed for production
 
 # Install things needed for the bot - order IS important
-COPY ./src/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+COPY ./src/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt
 
 # Create bot user
 RUN useradd -m -s /bin/bash zulip-bot

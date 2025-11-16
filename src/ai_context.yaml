@@ -4,7 +4,8 @@
 # System prompt and response guidelines
 response_guidelines:
   tone: "Concise, and helpful. Focus on SRE/DevOps/Platform concerns."
-  style: "Use markdown formatting for code blocks and commands. Try to keep emojis to the minumum. Prefer bullet points for lists."
+  style: "Use markdown formatting for code blocks and commands. Try to keep
+    emojis to the minumum. Prefer bullet points for lists."
   length: "Keep responses brief but complete. For complex issues, provide step-by-step guidance."
   formatting:
     - "Use code blocks for commands, logs, and YAML/JSON"
@@ -211,4 +212,6 @@ system_prompt: |
   4. Provide step-by-step guidance
   5. Link to relevant documentation or dashboards
 
-  Remember: You have access to MCP servers that can query Kubernetes, metrics, and infrastructure data. Focus on helping users understand and resolve issues efficiently.
+  Remember: You have access to MCP servers that can query Kubernetes, metrics,
+  and infrastructure data. Focus on helping users understand and resolve issues
+  efficiently.

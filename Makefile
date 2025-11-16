@@ -44,7 +44,7 @@ build-debug: ## Build debug Docker image with testing tools
 		--progress=plain \
 		-f Dockerfile.debug \
 		-t $(IMAGE_NAME):debug-$(UNIQ) \
-		. 
+		.
 
 .PHONY: push
 push: build

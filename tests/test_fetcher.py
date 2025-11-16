@@ -4,21 +4,21 @@ import os
 import sys
 
 # Set up environment
-os.environ['NAUTOBOT_TOKEN'] = "REDACTED"
-os.environ['NAUTOBOT_URL'] = "https://REDACTED.REDACTED/api"
+os.environ["NAUTOBOT_TOKEN"] = "REDACTED"
+os.environ["NAUTOBOT_URL"] = "https://REDACTED.REDACTED/api"
 
 # Add src to path
-sys.path.insert(0, 'src')
+sys.path.insert(0, "src")
 
-from fetchers import get_nautobot_devices
+from fetchers import get_nautobot_devices  # noqa: E402
 
 # Test with different queries
-test_queries = ['c001', 'aus', 'aus1p1', 'node']
+test_queries = ["c001", "aus", "aus1p1", "node"]
 
 for query in test_queries:
     print(f"\n{'='*60}")
     print(f"Testing get_nautobot_devices with '{query}'...")
-    print('='*60)
+    print("=" * 60)
     try:
         result = get_nautobot_devices(query)
         if result:
@@ -30,4 +30,5 @@ for query in test_queries:
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()

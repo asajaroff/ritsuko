@@ -6,7 +6,6 @@ to prevent injection attacks and ensure data integrity.
 """
 
 import re
-import logging
 from typing import Tuple
 
 
@@ -36,12 +35,16 @@ def validate_node_name(node_name: str) -> Tuple[bool, str]:
         return False, f"Node name too long (max 255 characters, got {len(node_name)})"
 
     # Check for valid characters: alphanumeric, dash, dot, underscore
-    pattern = r'^[a-zA-Z0-9\-\._]+$'
+    pattern = r"^[a-zA-Z0-9\-\._]+$"
     if not re.match(pattern, node_name):
-        return False, "Node name contains invalid characters. Only alphanumeric, dash, dot, and underscore are allowed"
+        return (
+            False,
+            "Node name contains invalid characters. Only alphanumeric, dash, "
+            "dot, and underscore are allowed",
+        )
 
     # Additional safety check: prevent directory traversal attempts
-    if '..' in node_name or node_name.startswith('.') or node_name.startswith('-'):
+    if ".." in node_name or node_name.startswith(".") or node_name.startswith("-"):
         return False, "Node name contains suspicious patterns"
 
     return True, ""
@@ -68,7 +71,7 @@ def validate_ai_prompt(prompt: str) -> Tuple[bool, str]:
         return False, f"Prompt too long (max 16000 characters, got {len(prompt)})"
 
     # Check for null bytes which can cause issues
-    if '\x00' in prompt:
+    if "\x00" in prompt:
         return False, "Prompt contains invalid null bytes"
 
     return True, ""
@@ -89,7 +92,11 @@ def sanitize_for_logging(text: str, max_length: int = 200) -> str:
         return ""
 
     # Remove null bytes and control characters except newlines and tabs
-    sanitized = ''.join(char for char in text if char == '\n' or char == '\t' or (ord(char) >= 32 and ord(char) != 127))
+    sanitized = "".join(
+        char
+        for char in text
+        if char == "\n" or char == "\t" or (ord(char) >= 32 and ord(char) != 127)
+    )
 
     # Truncate if too long
     if len(sanitized) > max_length:
@@ -115,12 +122,27 @@ def validate_url_component(component: str) -> Tuple[bool, str]:
 
     # Check for URL-unsafe characters that could cause injection
     # Allow alphanumeric, dash, underscore, dot, and percent-encoded characters
-    pattern = r'^[a-zA-Z0-9\-\._~%]+$'
+    pattern = r"^[a-zA-Z0-9\-\._~%]+$"
     if not re.match(pattern, component):
         return False, "URL component contains unsafe characters"
 
     # Check for suspicious patterns
-    dangerous_patterns = ['..', '//', '\\', '<', '>', '"', "'", ';', '&', '|', '`', '$', '(', ')']
+    dangerous_patterns = [
+        "..",
+        "//",
+        "\\",
+        "<",
+        ">",
+        '"',
+        "'",
+        ";",
+        "&",
+        "|",
+        "`",
+        "$",
+        "(",
+        ")",
+    ]
     for pattern in dangerous_patterns:
         if pattern in component:
             return False, f"URL component contains dangerous pattern: {pattern}"
