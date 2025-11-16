@@ -66,6 +66,7 @@ release: ## Updates the git tag in chart/Chart.yaml, commits it and pushes it up
 dev: ## Runs the container locally
 	docker run -ti \
 		-v $(HOME)/.kube:/home/zulip/.kube \
+		$(RUN_ARGS) \
 		$(IMAGE_UNIQ)
 
 debug: build-debug ## Runs the debug container locally with debug tools
