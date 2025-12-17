@@ -11,12 +11,18 @@ import zulip
 from commands import execute_command
 
 # Set up logging
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    level=log_level,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     stream=sys.stdout,
+    force=True,  # Force reconfiguration even if logging was already set up
 )
+
+# Log the logging configuration for debugging
+logging.info(f"Logging initialized at {log_level} level")
+logging.debug("Debug logging is enabled")
 
 # Cache bot profile to avoid repeated API calls
 BOT_PROFILE = None
