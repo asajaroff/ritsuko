@@ -1,9 +1,15 @@
-IMAGE_NAME=harbor.eencloud.com/test/ritsuko
+IMAGE_NAME=ritsuko
 UNIQ=$(shell git rev-parse --short HEAD)
-IMAGE_TAG=v1.5.0
-IMAGE_TAG_UNIQ=$(IMAGE_TAG)-$(UNIQ)
+
+# Generate version from git describe, fallback to v0.0.0-<hash> if no tags
+GIT_VERSION=$(shell git describe --tags --always 2>/dev/null || echo "v0.0.0-$(UNIQ)")
+VERSION=$(GIT_VERSION)
+
+# Keep IMAGE_TAG for backward compatibility but derive from VERSION
+IMAGE_TAG=$(VERSION)
+IMAGE_TAG_UNIQ=$(IMAGE_TAG)
 IMAGE=$(IMAGE_NAME):$(IMAGE_TAG)
-IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG)-$(UNIQ)
+IMAGE_UNIQ=$(IMAGE_NAME):$(IMAGE_TAG_UNIQ)
 
 ANTHROPIC_API_KEY=$(shell env | grep ANTHROPIC_API_KEY | cut -d'=' --fields 2)
 ZULIP_SITE=$(shell cat .env | grep ZULIP_SITE | cut -d'=' -f 2)
@@ -22,7 +28,7 @@ RUN_ARGS=\
 	-e ZULIP_SITE=$(ZULIP_SITE) \
 	-e NAUTOBOT_TOKEN=$(NAUTOBOT_TOKEN) \
 	-e NAUTOBOT_URL=$(NAUTOBOT_URL) \
-	-e RITSUKO_VERSION='Development version running in devbox' \
+	-e RITSUKO_VERSION='$(VERSION) (local development)' \
 
 .PHONY: help
 .DEFAULT_GOAL=help
@@ -32,16 +38,20 @@ help: ## Show this help
 
 .PHONY: build
 build: ## Build production Docker image
+	@echo "Building version: $(VERSION)"
 	docker build \
 		--progress=plain \
+		--build-arg VERSION=$(VERSION) \
 		-t $(IMAGE) \
 		-t $(IMAGE_UNIQ) \
 		.
 
 .PHONY: build-debug
 build-debug: ## Build debug Docker image with testing tools
+	@echo "Building debug version: $(VERSION)-debug"
 	docker build \
 		--progress=plain \
+		--build-arg VERSION=$(VERSION)-debug \
 		-f Dockerfile.debug \
 		-t $(IMAGE_NAME):debug-$(UNIQ) \
 		.
@@ -58,10 +68,14 @@ run: build ## Runs the container locally with docker
 		docker.io/$(IMAGE_UNIQ)
 
 .PHONY: release
-release: ## Updates the git tag in chart/Chart.yaml, commits it and pushes it upstream
-	yq -y --in-place ".appVersion = \"$(IMAGE_TAG_UNIQ)\"" chart/Chart.yaml
-	echo 'git add chart/Chart.yaml'
-	echo 'git commit -m "Upadting chart appVersion to $(IMAGE_TAG_UNIQ)"'
+release: ## Updates chart appVersion, commits it
+	@echo "Current version: $(VERSION)"
+	@echo "Updating chart/Chart.yaml with version $(VERSION)"
+	yq -y --in-place ".appVersion = \"$(VERSION)\"" chart/Chart.yaml
+	git add chart/Chart.yaml
+	git commit -m "chore: update chart appVersion to $(VERSION)"
+	@echo "Release committed. To create tag, run: make tag"
+	@echo "To push, run: make push-release"
 
 dev: ## Runs the container locally
 	docker run -ti \
@@ -141,3 +155,28 @@ helm-uninstall: ## Installs the chart
 	helm del ${HELM_RELEASE_NAME}
 
 helm-reinstall: helm-uninstall helm-install
+
+.PHONY: tag
+tag: ## Create and push git tag based on semantic version
+	@echo "Current version from git: $(VERSION)"
+	@read -p "Enter new version tag (e.g., v1.5.1): " NEW_VERSION; \
+	if [ -z "$$NEW_VERSION" ]; then \
+		echo "Error: Version cannot be empty"; \
+		exit 1; \
+	fi; \
+	echo "Creating tag $$NEW_VERSION"; \
+	git tag -a $$NEW_VERSION -m "Release $$NEW_VERSION"; \
+	echo "Tag created. To push, run: git push origin $$NEW_VERSION"
+
+.PHONY: push-release
+push-release: ## Push commits and tags to remote
+	git push origin $(shell git branch --show-current)
+	git push origin --tags
+
+.PHONY: version
+version: ## Show current version information
+	@echo "Git version: $(GIT_VERSION)"
+	@echo "Version: $(VERSION)"
+	@echo "Image tag: $(IMAGE_TAG)"
+	@echo "Unique tag: $(IMAGE_TAG_UNIQ)"
+	@echo "Full image: $(IMAGE_UNIQ)"

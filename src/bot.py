@@ -18,8 +18,6 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-RITSUKO_VERSION = "local-dev"
-
 # Cache bot profile to avoid repeated API calls
 BOT_PROFILE = None
 
@@ -161,23 +159,6 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         pass
 
 
-def start_health_server(port=8080):
-    """Start HTTP server for health checks in a separate thread."""
-    # Bind to 0.0.0.0 to allow Kubernetes health checks from outside container
-    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)  # nosec B104
-    logging.info(f"Starting health check server on port {port}")
-
-    def serve():
-        try:
-            server.serve_forever()
-        except Exception as e:
-            logging.error(f"Health check server error: {e}")
-
-    thread = threading.Thread(target=serve, daemon=True)
-    thread.start()
-    return server
-
-
 def send_message(message_dict):
     """Send a message with error handling."""
     try:
@@ -211,12 +192,15 @@ def handle_message(message):
         mentioned_user_ids = message.get("mentioned_user_ids", [])
         msg_type = message.get("type", "unknown")
         content = message.get("content", "")
+        sender_email = message.get("sender_email", "unknown")
+
+        # Log all incoming messages at INFO level
+        logging.info(f"Received message from {sender_email} (type: {msg_type}): {content}")
 
         logging.debug(
             f"Message type: {msg_type}, Bot ID: {bot_user_id}, "
             f"Mentioned IDs: {mentioned_user_ids}"
         )
-        logging.debug(f"Message content: {content}")
 
         # Check if bot is mentioned
         bot_mentioned = (
@@ -268,8 +252,8 @@ def handle_message(message):
         if not should_respond:
             return
 
-        # Log the message
-        logging.info(f'{message["sender_email"]}: {message["content"]}')
+        # Log that we're responding to this message
+        logging.info(f"Responding to message from {sender_email}")
 
         # Check authorization
         if message["sender_email"] not in authorized_users:
@@ -439,9 +423,6 @@ def initialize_zulip_client():
 def main():
     """Main function to run the bot with resilient error handling."""
     global BOT_PROFILE, client
-
-    # Start health check server first so K8s doesn't kill us during initialization
-    start_health_server(port=8080)
 
     # Initialize Zulip client with retry logic
     try:

@@ -8,6 +8,122 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Automatic version management system** (`src/version.py`, `Makefile`, `Dockerfile`, `Dockerfile.debug`)
+  - New centralized version module (`src/version.py`) with hybrid approach:
+    - Attempts `git describe --tags --always --dirty` for development environments
+    - Falls back to hardcoded `__version__` metadata for containerized deployments
+    - Environment variable `RITSUKO_VERSION` takes precedence for runtime overrides
+  - Context-aware version detection:
+    - Automatically detects kubernetes, container, development, or local context
+    - Returns detailed version information with source (git vs metadata)
+  - Three key functions:
+    - `_get_git_version()` - Git describe with error handling
+    - `get_version()` - Version string with priority fallback chain
+    - `get_version_info()` - Dict with version, context, and source
+  - Makefile now automatically generates VERSION from git:
+    - `GIT_VERSION=$(shell git describe --tags --always 2>/dev/null || echo "v0.0.0-$(UNIQ)")`
+    - All build targets pass `--build-arg VERSION=$(VERSION)` to Docker
+  - Dockerfiles accept VERSION as build argument:
+    - Updates `version.py` during build using sed
+    - Sets `ENV RITSUKO_VERSION="${VERSION}"` from build arg
+  - New Makefile targets:
+    - `make version` - Display current version information
+    - `make tag` - Create git tags with interactive prompt
+    - `make push-release` - Push commits and tags to remote
+  - Benefits:
+    - Single source of truth (git tags)
+    - No manual version updates needed
+    - Works in all contexts (local dev, container, kubernetes)
+    - Graceful fallback for environments without git
+
+### Changed
+
+- **Version command enhancement** (`src/commands.py`)
+  - Updated `handle_version()` to use new `get_version_info()` function
+  - Now displays context information: "Ritsuko {version} ({context})"
+  - Context descriptions:
+    - "running in Kubernetes" - when deployed in k8s cluster
+    - "running in container" - when in Docker container
+    - "running in development mode" - when using git describe
+    - "running locally" - fallback for local execution
+  - Removed hardcoded fallback: `"v1.0.5 running in Alejandro's laptop"`
+  - More informative and professional version reporting
+
+- **Makefile version automation** (`Makefile`)
+  - Removed hardcoded `IMAGE_TAG=v1.5.0`
+  - Now derives `IMAGE_TAG` from `VERSION` (git describe)
+  - Updated `RUN_ARGS` to use `$(VERSION) (local development)` instead of hardcoded string
+  - Build targets now display version being built
+  - `IMAGE_TAG_UNIQ` simplified since VERSION already includes commit hash
+
+- **Makefile release target fixes** (`Makefile`)
+  - Fixed broken release target (lines 60-64):
+    - Removed `echo` statements that prevented actual execution
+    - Now properly executes `git add` and `git commit`
+    - Updates `chart/Chart.yaml` with current VERSION
+    - Provides helpful next-step instructions (make tag, make push-release)
+
+- **Dockerfile version injection** (`Dockerfile`, `Dockerfile.debug`)
+  - Added `ARG VERSION=unknown` (production) and `ARG VERSION=unknown-debug` (debug)
+  - Injects version into `version.py` during build using sed
+  - Replaced hardcoded `ENV RITSUKO_VERSION='v1.0.0'` with dynamic `"${VERSION}"`
+  - Version is now set at build time, not hardcoded in image
+
+- **Helm chart version simplification** (`chart/templates/deployment.yaml`)
+  - Simplified `RITSUKO_VERSION` environment variable:
+    - Changed from: `"{{ $.Chart.AppVersion }} running in context 'test'"`
+    - Changed to: `"{{ $.Chart.AppVersion }}"`
+  - Allows version module to auto-detect kubernetes context
+  - More accurate context reporting in version command
+
+### Removed
+
+- **Unused version variable** (`src/bot.py`)
+  - Removed unused `RITSUKO_VERSION = "local-dev"` variable (line 21)
+  - Version is now accessed via version module, not global variable
+  - Eliminates duplicate version definitions
+
+### Fixed
+
+- **Version inconsistencies across 7 locations**
+  - Consolidated versions that were previously out of sync:
+    - Dockerfile: `v1.0.0` (hardcoded, outdated)
+    - Dockerfile.debug: `v1.0.0-debug` (hardcoded)
+    - Makefile: `IMAGE_TAG=v1.5.0` (hardcoded)
+    - chart/Chart.yaml: `appVersion: v1.5.0-81a1326` (manual)
+    - Git tags: `v1.2.3` (20 commits behind)
+    - src/commands.py: `"v1.0.5 running in Alejandro's laptop"` (hardcoded)
+    - src/bot.py: `RITSUKO_VERSION = "local-dev"` (unused)
+  - All versions now derive from single source: git describe
+
+- **Broken release process**
+  - Release target now actually executes git commands instead of echoing them
+  - Chart.yaml appVersion is properly updated and committed
+  - Clear workflow: `make release` → `make tag` → `make push-release`
+
+### Technical Improvements
+
+- **Version Management Architecture**:
+  - Priority chain: Environment variable > Git describe > Hardcoded metadata
+  - Works seamlessly in all environments (development, container, kubernetes)
+  - Build-time version injection ensures containers have correct version
+  - Runtime override capability for testing and special deployments
+  - Graceful degradation when git is unavailable
+  - Self-documenting with context information
+
+- **Developer Experience**:
+  - No manual version updates required
+  - `make version` shows all version information at a glance
+  - `make build` automatically uses correct version
+  - Git tags are now the authoritative version source
+  - Interactive tagging with `make tag` prevents mistakes
+
+- **Production Readiness**:
+  - Version visible in logs and via version command
+  - Context detection helps with debugging deployment issues
+  - No hardcoded secrets in version management code
+  - Safe to commit all version management files to git
+
 - **AI command for Claude API integration** (`src/commands.py`, `src/bot.py`, `src/requirements.txt`)
   - New `ai` command that allows users to interact with Claude AI (Sonnet 4.5)
   - Command accepts a prompt and returns AI-generated responses

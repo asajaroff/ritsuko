@@ -1,5 +1,8 @@
 FROM python:3.13-slim-bookworm
 
+# Accept version as build argument
+ARG VERSION=unknown-debug
+
 # Install system dependencies including network debugging tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -21,8 +24,13 @@ RUN pip install --no-cache-dir --break-system-packages -r requirements.txt && \
 RUN useradd -m -s /bin/bash zulip-bot
 WORKDIR /home/zulip-bot
 COPY --chown=zulip-bot:zulip-bot ./src/ ./
+
+# Update version.py with build-time version
+RUN sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" /home/zulip-bot/version.py
+
 USER zulip-bot
 
-ENV RITSUKO_VERSION='v1.0.0-debug'
+# Set version environment variable (can be overridden at runtime)
+ENV RITSUKO_VERSION="${VERSION}"
 
 CMD ["python3", "bot.py"]

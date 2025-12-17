@@ -8,6 +8,7 @@ from fetchers import get_nautobot_devices
 from nodes import handle_node
 from rate_limiter import claude_rate_limiter
 from validation import sanitize_for_logging, validate_ai_prompt, validate_node_name
+from version import get_version_info
 
 # Import anthropic for AI functionality
 try:
@@ -312,8 +313,20 @@ def handle_nautobot(args):
 
 def handle_version(message, args):
     """Handle the version command."""
-    default_version = "v1.0.5 running in Alejandro's laptop"
-    return f"Ritsuko {environ.get('RITSUKO_VERSION', default_version)}"
+    version_info = get_version_info()
+    version = version_info["version"]
+    context = version_info["context"]
+
+    # Map context to user-friendly description
+    context_descriptions = {
+        "kubernetes": "running in Kubernetes",
+        "container": "running in container",
+        "development": "running in development mode",
+        "local": "running locally",
+    }
+
+    context_desc = context_descriptions.get(context, context)
+    return f"Ritsuko {version} ({context_desc})"
 
 
 def handle_unknown(message, command):
